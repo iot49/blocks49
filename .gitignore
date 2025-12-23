@@ -1,3 +1,8 @@
+models/
+datasets/
+.envrc
+.env
+
 # Python
 __pycache__/
 *.py[cod]
@@ -15,7 +20,15 @@ yarn-error.log*
 .DS_Store
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
 
 # Agent
 .gemini/
+
+# Override global/parent ignores for gemini to work properly
+!/
