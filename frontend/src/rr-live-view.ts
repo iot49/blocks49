@@ -41,10 +41,222 @@ export class RrLiveView extends LitElement {
   @query('video')
   private _video!: HTMLVideoElement;
 
+  private _worker: Worker | null = null;
+  private _isWorkerBusy = false;
+  private _lastDisplayUpdateTime = 0;
   private _loopId: number | null = null;
-  private _isProcessing = false;
   private _frameCount = 0;
   private _lastFpsTime = 0;
+
+  async connectedCallback() {
+    super.connectedCallback();
+    this._initWorker();
+    await this._startCamera();
+    this._startLoop();
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this._stopCamera();
+    this._stopLoop();
+    this._terminateWorker();
+  }
+
+  private _initWorker() {
+    if (this._worker) return;
+    
+    // Vite handles ?worker imports
+    this._worker = new Worker(new URL('./app/classifier.worker.ts', import.meta.url), { type: 'module' });
+    
+    this._worker.onmessage = (e) => {
+        const { type, payload, error } = e.data;
+        if (type === 'results') {
+            this._handleWorkerResults(payload.results, payload.inferenceTimeMs);
+        } else if (type === 'error') {
+            console.error("[ClassifierWorker] Error:", error);
+        }
+    };
+
+    if (this.classifier) {
+        this._worker.postMessage({ 
+            type: 'init', 
+            payload: { model: this.classifier.model, precision: this.classifier.precision } 
+        });
+    }
+  }
+
+  private _terminateWorker() {
+      if (this._worker) {
+          this._worker.terminate();
+          this._worker = null;
+      }
+  }
+
+  private _handleWorkerResults(results: Record<string, string>, inferenceTimeMs: number) {
+      this._isWorkerBusy = false;
+      
+      const labels = this.manifest?.images?.[0]?.labels;
+      if (!labels) return;
+
+      const markerResults: LiveMarker[] = Object.entries(results).map(([id, prediction]) => ({
+          id,
+          x: labels[id]?.x || 0,
+          y: labels[id]?.y || 0,
+          prediction
+      }));
+
+      const now = performance.now();
+      // Throttle display updates and logging to every 1 second
+      if (now - this._lastDisplayUpdateTime >= 5000) {
+          this._detectedMarkers = markerResults;
+          this._lastDisplayUpdateTime = now;
+          this._stats = { ...this._stats, timeMs: inferenceTimeMs };
+          
+          if (Object.keys(results).length > 0) {
+              // console.log(`[LiveView] Results (${Object.keys(results).length} markers):`, results);
+          } else {
+              console.log("[LiveView] No markers detected");
+          }
+      }
+  }
+
+  private async _startCamera() {
+    try {
+      this._stream = await getCameraStream();
+
+      await this.updateComplete;
+
+      if (this._video) {
+        this._video.srcObject = this._stream;
+        this._video.setAttribute('playsinline', '');
+        this._video.muted = true;
+        await this._video.play();
+      }
+    } catch (e) {
+      console.error("Failed to start camera", e);
+    }
+  }
+
+  private _stopCamera() {
+    if (this._stream) {
+      this._stream.getTracks().forEach(track => track.stop());
+      this._stream = null;
+    }
+  }
+
+  private _startLoop() {
+    if (this._loopId) return;
+
+    this._lastFpsTime = performance.now();
+
+    const loop = async (_: number) => {
+      if (!this.isConnected) return;
+
+      if (!this._isWorkerBusy && this._video && this._video.readyState >= 2) {
+        await this._sendFrameToWorker();
+      }
+
+      this._loopId = requestAnimationFrame(loop);
+    };
+    this._loopId = requestAnimationFrame(loop);
+  }
+
+  private _stopLoop() {
+    if (this._loopId) {
+      cancelAnimationFrame(this._loopId);
+      this._loopId = null;
+    }
+  }
+
+  private async _sendFrameToWorker() {
+    if (!this.manifest || !this.manifest.images || this.manifest.images.length === 0) return;
+    if (!this._worker) return;
+
+    const labels = this.manifest.images[0].labels;
+    if (!labels) return;
+
+    const dpt = this.manifest.dots_per_track;
+    if (dpt <= 0) return;
+
+    this._isWorkerBusy = true;
+    const startTime = performance.now();
+
+    try {
+        const imageBitmap = await createImageBitmap(this._video);
+
+        // Extract marker positions to simplify worker payload
+        const markers: Record<string, {x: number, y: number}> = {};
+        for (const [id, marker] of Object.entries(labels)) {
+            markers[id] = { 
+                x: marker.x, 
+                y: marker.y
+            };
+        }
+
+        this._worker.postMessage({
+            type: 'classify-batch',
+            payload: {
+                imageBitmap,
+                markers,
+                dpt,
+                timestamp: startTime
+            }
+        }, [imageBitmap]); // Transfer the bitmap
+
+        // Update local stats (just for tracking intended throughput)
+        this._frameCount++;
+        
+        if (startTime - this._lastFpsTime >= 1000) {
+            this._stats = {
+                ...this._stats,
+                fps: Math.round(this._frameCount * 1000 / (startTime - this._lastFpsTime)),
+                count: this._frameCount
+            };
+            this._frameCount = 0;
+            this._lastFpsTime = startTime;
+        }
+
+    } catch (e) {
+        console.error("Inference Post Error", e);
+        this._isWorkerBusy = false;
+    }
+  }
+
+  render() {
+    const w = this._video?.videoWidth || 100;
+    const h = this._video?.videoHeight || 100;
+
+    // Calculate scale factors for rendering
+    const manifestW = this.manifest?.camera.resolution.width || w;
+    const manifestH = this.manifest?.camera.resolution.height || h;
+    const scaleX = w / manifestW;
+    const scaleY = h / manifestH;
+
+    // Live Stats Template
+    const { fps, timeMs } = this._stats;
+    const statusTemplate = html`
+        <div slot="status" class="status-bar">
+            <span>Live View</span>
+            <span>FPS: ${fps}</span>
+            <span>Inf Time: ${timeMs}ms</span>
+            <span>Model: ${this.classifier ? `${this.classifier.model}-${this.classifier.precision}` : 'None'}</span>
+        </div>
+    `;
+
+    return html`
+      <rr-page>
+        ${statusTemplate}
+        <div style="position: relative; width: 100%; height: 100%;">
+            <video></video>
+            <svg class="overlay-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+                ${getMarkerDefs(LIVE_MARKER_SIZE)}
+                ${this._detectedMarkers.map(m => 
+                  svg`<g><use href="#${m.prediction}" x="${m.x * scaleX}" y="${m.y * scaleY}"></use></g>`)}
+            </svg>
+        </div>
+      </rr-page>
+    `;
+  }
 
   static styles = [
     statusBarStyles,
@@ -83,162 +295,5 @@ export class RrLiveView extends LitElement {
         stroke-width: 3;
     }
   `];
-
-  async connectedCallback() {
-    super.connectedCallback();
-    await this._startCamera();
-    this._startLoop();
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    this._stopCamera();
-    this._stopLoop();
-  }
-
-  private async _startCamera() {
-    try {
-      this._stream = await getCameraStream();
-
-      await this.updateComplete;
-
-      if (this._video) {
-        this._video.srcObject = this._stream;
-        this._video.setAttribute('playsinline', '');
-        this._video.muted = true;
-        await this._video.play();
-      }
-    } catch (e) {
-      console.error("Failed to start camera", e);
-      // alert("Failed to start camera: " + (e as Error).message);
-    }
-  }
-
-  private _stopCamera() {
-    if (this._stream) {
-      this._stream.getTracks().forEach(track => track.stop());
-      this._stream = null;
-    }
-  }
-
-  private _startLoop() {
-    if (this._loopId) return;
-
-    this._lastFpsTime = performance.now();
-
-    const loop = async (timestamp: number) => {
-      if (!this.isConnected) return;
-
-      if (!this._isProcessing && this._video && this._video.readyState >= 2) {
-        await this._processFrame(timestamp);
-      }
-
-      this._loopId = requestAnimationFrame(loop);
-    };
-    this._loopId = requestAnimationFrame(loop);
-  }
-
-  private _stopLoop() {
-    if (this._loopId) {
-      cancelAnimationFrame(this._loopId);
-      this._loopId = null;
-    }
-  }
-
-  private async _processFrame(timestamp: number) {
-    if (!this.manifest || !this.manifest.images || this.manifest.images.length === 0) return;
-    if (!this.classifier) return;
-
-    // Use Image 0 as reference for labels for now
-    const labels = this.manifest.images[0].labels;
-    if (!labels) return;
-
-    this._isProcessing = true;
-    const startTime = performance.now();
-
-    try {
-        // Create ImageBitmap from video frame efficiently
-        // Note: createImageBitmap(video) is fast
-        const bitmap = await createImageBitmap(this._video);
-        
-        const dpt = this.manifest.dots_per_track;
-        const results: LiveMarker[] = [];
-        
-        // Skip inference if DPT invalid
-        if (dpt > 0) {
-             const promises = Object.entries(labels).map(async ([id, marker]) => {
-                  try {
-                      // We limit inference to labels roughly within view? 
-                      // For now, check all.
-                      const center = { x: marker.x, y: marker.y };
-                      const prediction = await this.classifier!.classify(bitmap, center, dpt);
-                      
-                      results.push({
-                          id,
-                          x: marker.x,
-                          y: marker.y,
-                          prediction
-                      });
-                  } catch (e) {
-                      // ignore out of bound patches etc
-                  }
-             });
-             
-             await Promise.all(promises);
-        }
-        
-        bitmap.close();
-        this._detectedMarkers = results;
-
-    } catch (e) {
-        console.error("Inference Error", e);
-    }
-
-    const duration = performance.now() - startTime;
-    this._frameCount++;
-    
-    // Update Stats every second
-    if (timestamp - this._lastFpsTime >= 1000) {
-        this._stats = {
-            fps: Math.round(this._frameCount * 1000 / (timestamp - this._lastFpsTime)),
-            count: this._frameCount,
-            timeMs: Math.round(duration)
-        };
-        this._frameCount = 0;
-        this._lastFpsTime = timestamp;
-    }
-
-    this._isProcessing = false;
-  }
-
-  render() {
-    const w = this._video?.videoWidth || 100;
-    const h = this._video?.videoHeight || 100;
-
-    // Live Stats Template
-    const { fps, timeMs } = this._stats;
-    const statusTemplate = html`
-        <div slot="status" class="status-bar">
-            <span>Live View</span>
-            <span>FPS: ${fps}</span>
-            <span>Inf Time: ${timeMs}ms</span>
-            <span>Model: ${this.classifier ? `${this.classifier.model}-${this.classifier.precision}` : 'None'}</span>
-        </div>
-    `;
-
-    return html`
-      <rr-page>
-        ${statusTemplate}
-        <div style="position: relative; width: 100%; height: 100%;">
-            <video></video>
-            <svg class="overlay-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
-                ${getMarkerDefs(LIVE_MARKER_SIZE)}
-                ${this._detectedMarkers.map(m => 
-                  svg`<g><use href="#${m.prediction}" x="${m.x}" y="${m.y}"></use></g>`)}
-            </svg>
-        </div>
-      </rr-page>
-    `;
-  }
 
 }

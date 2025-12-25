@@ -50,6 +50,11 @@ export class RrMain extends LitElement {
       const detail = (e as CustomEvent).detail;
       const { model, precision } = detail;
       
+      // Deduplicate: Don't recreate if settings are the same
+      if (this._classifier && this._classifier.model === model && this._classifier.precision === precision) {
+          return;
+      }
+
       console.log(`Setting classifier: ${model} (${precision})`);
       this._classifier = new Classifier(model, precision);
   }

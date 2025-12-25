@@ -5,7 +5,7 @@ export const DEFAULT_PRECISION = 'int8';
 
 export const MODEL_LIST = [
   'resnet18',
-  'mobilenetV2',
+  // 'mobilenetV2',
 ];
 
 export const PRECISION_OPTIONS = [

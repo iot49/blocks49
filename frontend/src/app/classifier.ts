@@ -1,6 +1,9 @@
-declare const ort: any;
-
+import * as ort from "onnxruntime-web";
 import { createContext } from "@lit/context";
+
+// Configure WASM paths to use the CDN to avoid local serving issues with MIME types
+ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/';
+
 import type { Point } from './manifest';
 
 export type ModelPrecision = 'fp32' | 'fp16' | 'int8';
@@ -20,7 +23,7 @@ export class Classifier {
   readonly model: string;
   readonly precision: ModelPrecision;
 
-  constructor(modelName: string, precision: ModelPrecision = 'fp32') {
+  constructor(modelName: string, precision: ModelPrecision) {
     this.model = modelName;
     this.precision = precision;
   }
@@ -36,7 +39,7 @@ export class Classifier {
   }
 
   private async _doInitialize(modelData?: Uint8Array): Promise<void> {
-    const baseUrl = `models/${this.model}`;
+    const baseUrl = `/models/${this.model}`;
     
     // 1. Load configuration
     try {
@@ -118,7 +121,7 @@ export class Classifier {
    * @param center Center point in source coordinates
    * @param img_dpt Dots-per-track of the source image
    */
-  async patch(image: CanvasImageSource, center: Point, img_dpt: number): Promise<HTMLCanvasElement | null> {
+  async patch(image: CanvasImageSource, center: Point, img_dpt: number): Promise<HTMLCanvasElement | OffscreenCanvas | null> {
     await this._ensureInitialized();
 
     const scaleFactor = this._config!.dpt / img_dpt; 
@@ -128,11 +131,19 @@ export class Classifier {
     const sx = center.x - srcSize / 2;
     const sy = center.y - srcSize / 2;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = dstSize;
-    canvas.height = dstSize;
-    
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    let canvas: HTMLCanvasElement | OffscreenCanvas;
+    let ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+
+    if (typeof document !== 'undefined') {
+        canvas = document.createElement('canvas');
+        canvas.width = dstSize;
+        canvas.height = dstSize;
+        ctx = canvas.getContext('2d', { willReadFrequently: true });
+    } else {
+        canvas = new OffscreenCanvas(dstSize, dstSize);
+        ctx = canvas.getContext('2d') as any; // Cast to any to avoid potential type mismatch issues in stricter envs
+    }
+
     if (!ctx) return null;
 
     // Background color (if patch goes out of bounds)
@@ -184,8 +195,8 @@ export class Classifier {
     return this._config!.labels[maxIdx] || 'unknown';
   }
 
-  private async _preprocess(canvas: HTMLCanvasElement): Promise<any> {
-      const ctx = canvas.getContext('2d');
+  private async _preprocess(canvas: HTMLCanvasElement | OffscreenCanvas): Promise<any> {
+      const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
       if (!ctx) throw new Error("No context");
       
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -210,8 +221,42 @@ export class Classifier {
            float32Data[2 * width * height + i] = (b - mean[2]) / std[2];
       }
 
-      return new ort.Tensor('float32', float32Data, [1, 3, height, width]);
+      if (this.precision === 'fp16') {
+          return new ort.Tensor('float16', float32ToFloat16(float32Data), [1, 3, height, width]);
+      } else {
+          return new ort.Tensor('float32', float32Data, [1, 3, height, width]);
+      }
   }
+}
+
+/**
+ * Converts a Float32Array to a Uint16Array containing IEEE 754 half-precision floats.
+ * Required for onnxruntime-web 'float16' tensors.
+ */
+function float32ToFloat16(float32Array: Float32Array): Uint16Array {
+    const float16Array = new Uint16Array(float32Array.length);
+    const floatView = new Float32Array(1);
+    const int32View = new Int32Array(floatView.buffer);
+
+    for (let i = 0; i < float32Array.length; i++) {
+        floatView[0] = float32Array[i];
+        const x = int32View[0];
+
+        const s = (x >> 16) & 0x8000; // sign
+        let e = ((x >> 23) & 0xff) - 127 + 15; // exponent
+        let m = (x >> 13) & 0x03ff; // mantissa (10 bits)
+
+        if (e <= 0) {
+            // Underflow/Denormal
+            float16Array[i] = s;
+        } else if (e >= 31) {
+            // Overflow/Infinity/NaN
+            float16Array[i] = s | 0x7c00;
+        } else {
+            float16Array[i] = s | (e << 10) | m;
+        }
+    }
+    return float16Array;
 }
 
 export const classifierContext = createContext<Classifier | undefined>('classifier');
