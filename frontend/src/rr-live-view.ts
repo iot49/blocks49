@@ -6,7 +6,7 @@ import { R49File, r49FileContext } from './app/r49file.ts';
 import { Classifier, classifierContext } from './app/classifier.ts';
 import { statusBarStyles } from './styles/status-bar.ts';
 import { getMarkerDefs } from './styles/marker-defs.ts';
-import { LIVE_MARKER_SIZE } from './app/config.ts';
+import { LIVE_DISPLAY_UPDATE_INTERVAL_MS, LIVE_MARKER_SIZE } from './app/config.ts';
 import { getCameraStream } from './app/capture.ts';
 
 interface LiveMarker {
@@ -107,7 +107,7 @@ export class RrLiveView extends LitElement {
 
       const now = performance.now();
       // Throttle display updates and logging to every 1 second
-      if (now - this._lastDisplayUpdateTime >= 5000) {
+      if (now - this._lastDisplayUpdateTime >= LIVE_DISPLAY_UPDATE_INTERVAL_MS) {
           this._detectedMarkers = markerResults;
           this._lastDisplayUpdateTime = now;
           this._stats = { ...this._stats, timeMs: inferenceTimeMs };

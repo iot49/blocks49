@@ -32,3 +32,5 @@ export const CAMERA_PARAMS = {
   width: { ideal: 4096 },
   height: { ideal: 2160 },
 }
+
+export const LIVE_DISPLAY_UPDATE_INTERVAL_MS = 2000;
