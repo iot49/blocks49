@@ -10,7 +10,6 @@ __pycache__/
 *.py[cod]
 *.class
 .venv
-.env
 
 # Javascript/Node
 node_modules/
@@ -32,5 +31,3 @@ yarn-error.log*
 # Agent
 .gemini/
 
-# Override global/parent ignores for gemini to work properly
-!/

@@ -21,8 +21,8 @@ def main():
     print(f"Exporting model {args.model}...")
 
     try:
-        # Export directly to frontend/public/models so they are available at /models/{name}
-        output_dir = Path("frontend/public/models") / args.model
+        # Export directly to ui/public/models so they are available at /models/{name}
+        output_dir = Path("ui/public/models") / args.model
         print(f"Target directory: {output_dir}")
 
         exporter = Exporter(args.model)
