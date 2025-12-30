@@ -1,29 +1,51 @@
-# R49 File Editor
+# RR Labeler UI
 
-- `https://iot49.org`
-- open .jpg (or .r49) file
-- calibrate:
-  - align rectangle to known dimensions in layout
-  - enter width and height (mm) (gear icon upper right)
-  - set scale
-- markers
-  - ?: detector location
-  - others are track, train, train-end, train-coupling for labeling
-  - delete
-- **save**:
-  - don't forget to save (.r49 file in ~/Downloads)
+A web-based tool for labeling, calibrating, and real-time monitoring of model railroad layouts.
 
+## Technical Stack
 
-## Operation
+- **Framework**: [Lit](https://lit.dev/) (Web Components)
+- **State Management**: Lit Context (`@lit/context`)
+- **Build Tool**: [Vite](https://vitejs.dev/)
+- **Machine Learning**: [onnxruntime-web](https://onnxruntime.ai/)
+- **Language**: TypeScript
 
-The intended operation is for the device (typically a smartphone) installed in a fixed location above the layout continuously capturing images and reporting the presence of trains.
+## Project Structure
 
-This requires a backend server running on a host device. The client (smartphone) connects to the backend via a secure websocket connection.
+- `src/`: Core source code
+  - `app/`: Business logic and app-level services
+    - `classifier.ts`: Main wrapper for ONNX inference.
+    - `classifier.worker.ts`: Web Worker for background classification.
+    - `r49file.ts`: Management of `.r49` project files.
+    - `manifest.ts`: Layout description and marker metadata.
+    - `capture.ts`: Camera and image acquisition utilities.
+  - `styles/`: Shared CSS and SVG definitions.
+  - `rr-main.ts`: Application entry and routing shell.
+  - `rr-label.ts`: The interactive labeling and calibration component.
+  - `rr-live-view.ts`: Real-time monitoring with background classification.
+  - `rr-settings.ts`: Model selection and global configuration.
 
-The server stores the layout description (.r49 file) for the setup.
+## Key Features
 
-The client has different modes of operation:
+### Real-time Live View
+The `rr-live-view` component acquired images at 60fps and performs asynchronous classification in a background Web Worker. It supports hardware acceleration via **WebGPU** and **WebNN** to minimize latency on modern devices (like Mac M-series).
 
-1) Live - continuously captures images and reports the presence of trains (for the markers of the first image in the manifest) to the server which makes this information available for use in other applications (e.g. jmri).
-2) Configure - create and edit the layout description (aquire images, calibrate, add and edit markers).
-3) Demo - used when no backend is available. In this case, the client loads a sample layout description (from `sample.r49`). The user can discard the sample and create their own from images captured with the camera or uploaded.
+### Labeling & Calibration
+The `rr-label` component allows users to define marker positions, types, and calibration rectangles. Calibration calculates the "Dots Per Track" (DPT) needed for the classifier to accurately normalize image patches.
+
+### Multi-Format Model Support
+The UI supports switching between **FP32**, **FP16**, and **Int8** quantized models. It automatically detects the available hardware backend (NPU, GPU, or CPU) and reports performance metrics like FPS and per-marker inference time.
+
+## Development
+
+```bash
+cd ui
+npm install
+npm run dev
+```
+
+The app will be available at `http://localhost:5173`.
+
+## Usage & Operation
+
+For a detailed user guide on calibration and labeling, see the top-level project documentation.
