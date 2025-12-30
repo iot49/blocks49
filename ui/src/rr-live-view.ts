@@ -1,3 +1,4 @@
+import { LIVE_DISPLAY_UPDATE_INTERVAL_MS, LIVE_MARKER_SIZE } from './app/config.ts';
 import { LitElement, html, css, svg } from 'lit';
 import { customElement, state, query } from 'lit/decorators.js';
 import { consume } from '@lit/context';
@@ -6,8 +7,8 @@ import { R49File, r49FileContext } from './app/r49file.ts';
 import { Classifier, classifierContext } from './app/classifier.ts';
 import { statusBarStyles } from './styles/status-bar.ts';
 import { getMarkerDefs } from './styles/marker-defs.ts';
-import { LIVE_DISPLAY_UPDATE_INTERVAL_MS, LIVE_MARKER_SIZE } from './app/config.ts';
 import { getCameraStream } from './app/capture.ts';
+
 
 interface LiveMarker {
   id: string;
@@ -29,24 +30,29 @@ export class RrLiveView extends LitElement {
     return this.r49File?.manifest;
   }
 
-  @state()
   private _stream: MediaStream | null = null;
 
+  // Consolidated state for rendering, throttled to reduce re-renders
   @state()
-  private _detectedMarkers: LiveMarker[] = [];
-
-  @state()
-  private _stats = { fps: 0, count: 0, timeMs: 0 };
+  private _displayState = {
+    markers: [] as LiveMarker[],
+    tTotMs: 0,
+    inferenceTimeMs: 0
+  };
 
   @query('video')
   private _video!: HTMLVideoElement;
 
-  private _worker: Worker | null = null;
   private _isWorkerBusy = false;
-  private _lastDisplayUpdateTime = 0;
+  private _worker: Worker | null = null;
   private _loopId: number | null = null;
-  private _frameCount = 0;
-  private _lastFpsTime = 0;
+
+  // time live-view was last updated
+  private _lastDisplayUpdateTime = 0;
+
+  // total time to grab and classify a frame
+  private _frameStartTime = 0;
+  private _tTotMs = 0;
 
   async connectedCallback() {
     super.connectedCallback();
@@ -98,19 +104,22 @@ export class RrLiveView extends LitElement {
       const labels = this.manifest?.images?.[0]?.labels;
       if (!labels) return;
 
-      const markerResults: LiveMarker[] = Object.entries(results).map(([id, prediction]) => ({
+      const classificationResults: LiveMarker[] = Object.entries(results).map(([id, prediction]) => ({
           id,
           x: labels[id]?.x || 0,
           y: labels[id]?.y || 0,
           prediction
       }));
 
+      // Throttle display updates and stats updates
       const now = performance.now();
-      // Throttle display updates and logging to every 1 second
       if (now - this._lastDisplayUpdateTime >= LIVE_DISPLAY_UPDATE_INTERVAL_MS) {
-          this._detectedMarkers = markerResults;
           this._lastDisplayUpdateTime = now;
-          this._stats = { ...this._stats, timeMs: inferenceTimeMs };
+          this._displayState = {
+              markers: classificationResults,
+              tTotMs: this._tTotMs,
+              inferenceTimeMs
+          };
           
           if (Object.keys(results).length > 0) {
               // console.log(`[LiveView] Results (${Object.keys(results).length} markers):`, results);
@@ -147,13 +156,18 @@ export class RrLiveView extends LitElement {
   private _startLoop() {
     if (this._loopId) return;
 
-    this._lastFpsTime = performance.now();
-
+    // Loop runs at the display refresh rate (e.g. 60fps).
+    // Classification is throttled to the worker's processing speed.
     const loop = async (_: number) => {
       if (!this.isConnected) return;
 
       if (!this._isWorkerBusy && this._video && this._video.readyState >= 2) {
-        await this._sendFrameToWorker();
+        const now = performance.now();
+        if (this._frameStartTime > 0) {
+          this._tTotMs = now - this._frameStartTime;
+        }
+        this._frameStartTime = now;
+        this._sendFrameToWorker();
       }
 
       this._loopId = requestAnimationFrame(loop);
@@ -179,7 +193,6 @@ export class RrLiveView extends LitElement {
     if (dpt <= 0) return;
 
     this._isWorkerBusy = true;
-    const startTime = performance.now();
 
     try {
         const imageBitmap = await createImageBitmap(this._video);
@@ -199,22 +212,10 @@ export class RrLiveView extends LitElement {
                 imageBitmap,
                 markers,
                 dpt,
-                timestamp: startTime
+                timestamp: this._frameStartTime
             }
         }, [imageBitmap]); // Transfer the bitmap
 
-        // Update local stats (just for tracking intended throughput)
-        this._frameCount++;
-        
-        if (startTime - this._lastFpsTime >= 1000) {
-            this._stats = {
-                ...this._stats,
-                fps: Math.round(this._frameCount * 1000 / (startTime - this._lastFpsTime)),
-                count: this._frameCount
-            };
-            this._frameCount = 0;
-            this._lastFpsTime = startTime;
-        }
 
     } catch (e) {
         console.error("Inference Post Error", e);
@@ -233,13 +234,17 @@ export class RrLiveView extends LitElement {
     const scaleY = h / manifestH;
 
     // Live Stats Template
-    const { fps, timeMs } = this._stats;
+    const { tTotMs, inferenceTimeMs, markers } = this._displayState;
+    const numMarkers = markers.length;
+    const perMarkerMs = numMarkers > 0 ? Number((inferenceTimeMs / numMarkers).toFixed(1)) : 0;
+
     const statusTemplate = html`
         <div slot="status" class="status-bar">
             <span>Live View</span>
-            <span>FPS: ${fps}</span>
-            <span>Inf Time: ${timeMs}ms</span>
             <span>Model: ${this.classifier ? `${this.classifier.model}-${this.classifier.precision}` : 'None'}</span>
+            <span>FPS: ${tTotMs > 0 ? Math.round(1000 / tTotMs) : 0}</span>
+            <!-- <span>Frame Acquisition: ${tTotMs > 0 ? Math.round(tTotMs - inferenceTimeMs) : 0}ms</span> -->
+            <span>${perMarkerMs}ms/marker</span>
         </div>
     `;
 
@@ -250,7 +255,7 @@ export class RrLiveView extends LitElement {
             <video></video>
             <svg class="overlay-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
                 ${getMarkerDefs(LIVE_MARKER_SIZE)}
-                ${this._detectedMarkers.map(m => 
+                ${this._displayState.markers.map(m => 
                   svg`<g><use href="#${m.prediction}" x="${m.x * scaleX}" y="${m.y * scaleY}"></use></g>`)}
             </svg>
         </div>
