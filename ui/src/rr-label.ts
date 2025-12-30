@@ -10,8 +10,6 @@ import { getMarkerDefs } from './styles/marker-defs.ts';
 import { R49File, r49FileContext } from './app/r49file.ts';
 import { Classifier, classifierContext } from './app/classifier.ts';
 
-/* Display current image with markers */
-
 interface ValidationResult {
   x: number;
   y: number;
@@ -24,12 +22,16 @@ interface ValidationResult {
   };
 }
 
-// DEBUG: sometimes switching images displays incorrect validation results for some markers
-// triggering an update (e.g. by moving a label) fixes it.
-// diagnose this issue and devise a plan to fix it.
-// Do not make any changes to the code until the issue is diagnosed, 
-// except adding console.log statements if needed.
-
+/**
+ * RrLabel is an interactive canvas for viewing and labeling layout images.
+ * 
+ * It manages:
+ * - Rendering the layout image and overlaying markers (Track, Train, etc.).
+ * - Calibration rectangle management for DPT calculation.
+ * - Interactive marker placement and dragging.
+ * - Real-time marker validation using the provided Classifier.
+ * - Deep validation/debugging via a floating popup (Shift-click/Debug tool).
+ */
 @customElement('rr-label')
 export class RrLabel extends LitElement {
   static styles = css`
@@ -83,25 +85,32 @@ export class RrLabel extends LitElement {
   // Derived from r49File context
   // get imageUrl removed, use r49File.getImageUrl(index) directly
 
+  /** The currently selected image index. */
   @property({ type: Number })
   imageIndex: number = -1;
 
+  /** The ImageBitmap of the currently selected image, used for classification. */
   @state()
-  private _imageBitmap: ImageBitmap | null = null; // Managed by r49File.dispose(), no manual close() here.
+  private _imageBitmap: ImageBitmap | null = null; 
   
+  /** Current validation results (matches/mismatches) for all markers on this image. */
   @state()
   validationResults: Record<string, ValidationResult> = {};
 
+  /** Tracking object to ignore stale async validation results. */
   private _markerValidationRequests: Record<string, number> = {};
 
+  /** The marker currently being dragged. */
   @state()
   private dragHandle: { id: string; category: MarkerCategory } | null = null;
 
+  /** The ID of the active tool from the editor sidebar. */
   @property({ attribute: false })
   activeTool: string | null = null;
 
+  /** Relative size of markers in SVG units, scaled based on current container width. */
   @state()
-  symbolSize: number = 48; // default, updated by resize observer
+  symbolSize: number = 48;
 
   private resizeObserver: ResizeObserver | null = null;
 
@@ -122,6 +131,10 @@ export class RrLabel extends LitElement {
     }
   }
 
+  /**
+   * Recalculates the SVG symbol size based on the current component width.
+   * This ensures markers remain a consistent physical size regardless of resizing.
+   */
   private updateSymbolSize() {
     if (!this.manifest || !this.manifest.camera) return;
 
@@ -178,6 +191,10 @@ export class RrLabel extends LitElement {
     }
   }
 
+  /**
+   * Performs real-time classification for all markers on the current image.
+   * Results are batched and updated in a single state change to minimize re-renders.
+   */
   private async validateMarkers() {
     if (this.dragHandle) return;
     const currentImageIndex = this.imageIndex;
@@ -334,6 +351,10 @@ export class RrLabel extends LitElement {
     return p.matrixTransform(ctm.inverse());
   }
 
+  /**
+   * Opens a debug popup at the clicked location, showing a scaled image patch
+   * and the model's classification result.
+   */
   private async debugClick(event: MouseEvent) {
     const screenCoords = this.toSVGPoint(event.clientX, event.clientY);
 
@@ -368,10 +389,15 @@ export class RrLabel extends LitElement {
         this.shadowRoot?.querySelector('#debug-popup-container')?.appendChild(resultDiv);
       });
 
-      this.shadowRoot?.querySelector('#debug-popup-container')?.appendChild(img_patch);
+      if (img_patch instanceof Node) {
+        this.shadowRoot?.querySelector('#debug-popup-container')?.appendChild(img_patch);
+      }
     }
   }
 
+  /**
+   * Handles click events for marker placement (Label mode) or debugging.
+   */
   private handleClick = (event: MouseEvent) => {
     // do not create label after dragging
     if (this.dragHandle === null) {

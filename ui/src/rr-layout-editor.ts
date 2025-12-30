@@ -11,8 +11,17 @@ import { layoutEditorStyles } from './styles/layout-editor.ts';
 
 import { statusBarStyles } from './styles/status-bar.ts';
 
-/* Layout Editor handles status bar, tool selection, image carousel, and layout image via rr-label */
-
+/**
+ * RrLayoutEditor is the primary workspace for creating and editing model railroad layouts.
+ * 
+ * It manages:
+ * - The status bar showing layout metadata (name, scale, size, DPT).
+ * - A sidebar with file tools (Open/Save) and labeling tools (Track, Train, etc.).
+ * - An image carousel (thumbnail bar) for navigating between captured images.
+ * - The main layout view (rendered via `rr-label`).
+ * 
+ * It also handles the initial loading of the demo project if no images are present.
+ */
 @customElement('rr-layout-editor')
 export class RrLayoutEditor extends LitElement {
   @consume({ context: r49FileContext, subscribe: true })
@@ -26,9 +35,11 @@ export class RrLayoutEditor extends LitElement {
     return this.manifest?.images || [];
   }
 
+  /** The index of the currently selected image in the manifest. */
   @state()
   currentImageIndex: number = -1;
 
+  /** The ID of the currently active tool (e.g. 'track', 'train', 'delete'). */
   @state()
   activeTool: string | null = null;
 
@@ -220,6 +231,9 @@ export class RrLayoutEditor extends LitElement {
     }
   }
 
+  /**
+   * Dispatches the image capture process and adds the result to the project.
+   */
   private async _performInstantCapture() {
     const file = await captureImage();
     if (file) {
@@ -227,6 +241,9 @@ export class RrLayoutEditor extends LitElement {
     }
   }
 
+  /**
+   * Handles adding a new image from either the camera or a file input.
+   */
   private _handleAddImageClick(source: 'camera' | 'file') {
     if (source === 'camera') {
       this._performInstantCapture();
@@ -239,6 +256,9 @@ export class RrLayoutEditor extends LitElement {
     }
   }
 
+  /**
+   * Deletes an image from the project and handles index management for the carousel.
+   */
   private _handleDeleteImage(e: Event, index: number) {
     e.stopPropagation(); // Prevent selecting the image when deleting
 
