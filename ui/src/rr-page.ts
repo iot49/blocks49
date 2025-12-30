@@ -3,6 +3,16 @@ import { customElement } from 'lit/decorators.js';
 import '@shoelace-style/shoelace/dist/components/dialog/dialog.js';
 import './rr-settings.ts';
 
+/**
+ * RrPage is a common layout wrapper for all main views in the application.
+ * 
+ * It provides a consistent header with:
+ * - A view toggle button (dispatches 'rr-view-toggle').
+ * - A slot for view-specific status information.
+ * - A settings button to open the global configuration dialog.
+ * 
+ * It also encapsulates the Shoelace dialog used for application-wide settings.
+ */
 @customElement('rr-page')
 export class RrPage extends LitElement {
   // ... styles ...
@@ -67,6 +77,9 @@ export class RrPage extends LitElement {
     }
   `;
 
+  /**
+   * Opens the settings dialog.
+   */
   private _handleSettingsClick() {
     const dialog = this.shadowRoot?.querySelector('sl-dialog') as any;
     if (dialog) {
@@ -74,6 +87,9 @@ export class RrPage extends LitElement {
     }
   }
 
+  /**
+   * Dispatches a global event to RrMain to toggle between Editor and Live modes.
+   */
   private _handleViewToggle() {
       this.dispatchEvent(new CustomEvent('rr-view-toggle', { bubbles: true, composed: true }));
   }
