@@ -54,7 +54,9 @@ export class RrLiveView extends LitElement {
     /** Total time taken for the entire frame processing cycle (capture + inference + overhead). */
     tTotMs: 0,
     /** Time spent by the worker on model inference for the last frame. */
-    inferenceTimeMs: 0
+    inferenceTimeMs: 0,
+    /** The actual hardware backend used for inference (NPU, GPU, WASM). */
+    executionProvider: ''
   };
 
   /** Reference to the video element used for frame capture. */
@@ -102,7 +104,7 @@ export class RrLiveView extends LitElement {
     this._worker.onmessage = (e) => {
         const { type, payload, error } = e.data;
         if (type === 'results') {
-            this._handleWorkerResults(payload.results, payload.inferenceTimeMs);
+            this._handleWorkerResults(payload.results, payload.inferenceTimeMs, payload.executionProvider);
         } else if (type === 'error') {
             console.error("[ClassifierWorker] Error:", error);
         }
@@ -130,7 +132,7 @@ export class RrLiveView extends LitElement {
    * @param results Map of marker ID to predicted label
    * @param inferenceTimeMs Total time spent by the worker on model inference
    */
-  private _handleWorkerResults(results: Record<string, string>, inferenceTimeMs: number) {
+  private _handleWorkerResults(results: Record<string, string>, inferenceTimeMs: number, executionProvider: string) {
       this._isWorkerBusy = false;
       
       const labels = this.manifest?.images?.[0]?.labels;
@@ -150,7 +152,8 @@ export class RrLiveView extends LitElement {
           this._displayState = {
               markers: classificationResults,
               tTotMs: this._tTotMs,
-              inferenceTimeMs
+              inferenceTimeMs,
+              executionProvider
           };
           
           if (Object.keys(results).length > 0) {
@@ -278,14 +281,14 @@ export class RrLiveView extends LitElement {
     const scaleY = h / manifestH;
 
     // Live Stats Template
-    const { tTotMs, inferenceTimeMs, markers } = this._displayState;
+    const { tTotMs, inferenceTimeMs, markers, executionProvider } = this._displayState;
     const numMarkers = markers.length;
     const perMarkerMs = numMarkers > 0 ? Number((inferenceTimeMs / numMarkers).toFixed(1)) : 0;
 
     const statusTemplate = html`
         <div slot="status" class="status-bar">
             <span>Live View</span>
-            <span>Model: ${this.classifier ? `${this.classifier.model}-${this.classifier.precision}` : 'None'}</span>
+            <span>Model: ${this.classifier ? `${this.classifier.model}-${this.classifier.precision}` : 'None'} (${executionProvider || '...'})</span>
             <span>FPS: ${tTotMs > 0 ? Math.round(1000 / tTotMs) : 0}</span>
             <!-- <span>Frame Acquisition: ${tTotMs > 0 ? Math.round(tTotMs - inferenceTimeMs) : 0}ms</span> -->
             <span>${perMarkerMs}ms/marker</span>

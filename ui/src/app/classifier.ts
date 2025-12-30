@@ -42,6 +42,35 @@ export class Classifier {
   }
 
   /**
+   * Returns the name of the active execution provider (e.g. WebGPU, WebNN, WASM).
+   */
+  get executionProvider(): string {
+    if (!this._session) return 'None';
+    
+    const sessionAny = this._session as any;
+    const handler = sessionAny.handler || sessionAny._handler;
+    const handlerName = handler?.constructor?.name || '';
+    
+    // 1. Direct identify by constructor name (unminified)
+    if (handlerName.includes('WebGpu')) return 'WebGPU';
+    if (handlerName.includes('WebNN')) return 'WebNN';
+    if (handlerName.includes('Wasm')) return 'WASM';
+    
+    // 2. Identify by internal properties (robust against minification)
+    // Most hardware backends store unique handles
+    if (handler?.device || handler?.adapter || handler?.gpuContext) return 'WebGPU';
+    if (handler?.context || handler?.mlContext || handler?.nnContext) return 'WebNN';
+    if (handler?.worker || sessionAny._sessionID || handler?._wasm) return 'WASM';
+    
+    // 3. Heuristic: if it's minified but not identifies, and we have many markers for acceleration
+    if (handlerName === 'hn' || handlerName === 'on') return 'Accel';
+    
+    // Fallback to name or CPU
+    if (handlerName && handlerName.length <= 3) return handlerName;
+    return handlerName || 'CPU';
+  }
+
+  /**
    * Ensures the model configuration and session are loaded.
    * Can be called explicitly for pre-loading, but is handled lazily by classify() and patch().
    */
@@ -91,8 +120,15 @@ export class Classifier {
             graphOptimizationLevel: 'all'
         };
 
+        console.log(`[Classifier] Initializing session with providers:`, options.executionProviders);
+        if (typeof navigator !== 'undefined' && (navigator as any).gpu) {
+            console.log("[Classifier] WebGPU is available in this environment.");
+        } else {
+            console.warn("[Classifier] WebGPU is NOT detected in this environment (navigator.gpu is missing).");
+        }
+
         this._session = await ort.InferenceSession.create(input, options);
-        console.log(`[Classifier] ${this.model} (${this.precision}) loaded successfully.`);
+        console.log(`[Classifier] ${this.model} (${this.precision}) loaded. Backend: ${this.executionProvider}`);
     } catch (e) {
         console.error(`[Classifier] Session Init Failed:`, e);
         throw e;

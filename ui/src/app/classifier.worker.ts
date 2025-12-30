@@ -69,7 +69,8 @@ self.onmessage = async (e: MessageEvent) => {
                     payload: { 
                         results, 
                         timestamp: payload.timestamp,
-                        inferenceTimeMs: Math.round(duration)
+                        inferenceTimeMs: Math.round(duration),
+                        executionProvider: classifier.executionProvider
                     } 
                 });
             } catch (err) {
