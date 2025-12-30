@@ -14,6 +14,15 @@ interface ClassifierConfig {
   cropSize: number;
 }
 
+/**
+ * Handles model inference using onnxruntime-web.
+ * Responsible for loading model configurations, managing inference sessions,
+ * and performing image preprocessing/postprocessing.
+ * 
+ * Public Interface:
+ * - classify(): Performs inference on a single marker.
+ * - patch(): Extracts a patch from the source image.
+ */
 export class Classifier {
   private _session: any = null;
   private _config: ClassifierConfig | null = null;
@@ -23,6 +32,10 @@ export class Classifier {
   readonly model: string;
   readonly precision: ModelPrecision;
 
+  /**
+   * @param modelName Name of the model directory in /public/models
+   * @param precision Numeric precision format ('fp32', 'fp16', or 'int8')
+   */
   constructor(modelName: string, precision: ModelPrecision) {
     this.model = modelName;
     this.precision = precision;
@@ -72,7 +85,9 @@ export class Classifier {
         }
 
         const options: any = {
-            executionProviders: ['wasm', 'cpu'],
+            // Enable hardware acceleration (WebNN for NPUs, WebGPU for GPUs)
+            // with automatic fallback to WASM if unsupported.
+            executionProviders: ['webnn', 'webgpu', 'wasm'],
             graphOptimizationLevel: 'all'
         };
 
@@ -160,6 +175,14 @@ export class Classifier {
     return canvas;
   }
 
+  /**
+   * Internal implementation of classification.
+   * Performs patch extraction, preprocessing, inference, and postprocessing.
+   * 
+   * @param image Source image
+   * @param center Center point for classification
+   * @param img_dpt Source image dots-per-track
+   */
   private async _doClassify(image: ImageBitmap, center: Point, img_dpt: number): Promise<string> {
     // 1. Extract patch (reusing our own public patch logic internally)
     const patchCanvas = await this.patch(image, center, img_dpt);
@@ -195,6 +218,12 @@ export class Classifier {
     return this._config!.labels[maxIdx] || 'unknown';
   }
 
+  /**
+   * Converts a canvas-based image patch into an ONNX tensor.
+   * Performs ImageNet normalization and channel-first (NCHW) reordering.
+   * 
+   * @param canvas The extracted image patch
+   */
   private async _preprocess(canvas: HTMLCanvasElement | OffscreenCanvas): Promise<any> {
       const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
       if (!ctx) throw new Error("No context");

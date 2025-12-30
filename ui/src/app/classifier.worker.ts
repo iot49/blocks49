@@ -1,14 +1,26 @@
+/**
+ * Classifier Web Worker
+ * 
+ * This worker performs model inference in a background thread to keep the 
+ * main UI responsive. It maintains a persistent instance of the Classifier
+ * and handles batch classification requests.
+ */
 import * as ort from 'onnxruntime-web';
 import { Classifier } from './classifier';
 
 let classifier: Classifier | null = null;
 let isBusy = false;
 
+/**
+ * Main message handler for the worker.
+ * Supports 'init' and 'classify-batch' message types.
+ */
 self.onmessage = async (e: MessageEvent) => {
     const { type, payload } = e.data;
 
     switch (type) {
         case 'init': {
+            /** Initialize or update the underlying Classifier model and requested precision (e.g. 'fp16' or 'int8'). */
             const { model, precision } = payload;
             try {
                 classifier = new Classifier(model, precision);
@@ -22,6 +34,10 @@ self.onmessage = async (e: MessageEvent) => {
         }
 
         case 'classify-batch': {
+            /** 
+             * Performs classification on a set of markers within a single image frame.
+             * Transfers findings back to main thread via 'results' message.
+             */
             if (!classifier || isBusy) return;
             isBusy = true;
 

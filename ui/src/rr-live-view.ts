@@ -17,6 +17,20 @@ interface LiveMarker {
   prediction: string;
 }
 
+/**
+ * RrLiveView provides a real-time camera view with overlayed classification results.
+ * 
+ * It uses a dual-threaded model:
+ * 1. Main Thread: Handles camera stream, UI rendering, and frame capture.
+ * 2. Web Worker: Handles synchronous ONNX inference to avoid blocking the UI.
+ * 
+ * Rendering in the main thread is throttled to reduce CPU/GPU load, while the 
+ * classification loop runs as fast as the hardware allows.
+ * 
+ * Public Interface:
+ * - classifier: The current active Classifier instance (FP32/FP16/Int8).
+ * - r49File: The active project context.
+ */
 @customElement('rr-live-view')
 export class RrLiveView extends LitElement {
   @consume({ context: r49FileContext, subscribe: true })
@@ -30,28 +44,36 @@ export class RrLiveView extends LitElement {
     return this.r49File?.manifest;
   }
 
+  /** The media stream from the camera. Used for teardown. */
   private _stream: MediaStream | null = null;
 
-  // Consolidated state for rendering, throttled to reduce re-renders
+  /** Consolidated state for rendering, throttled to reduce re-renders. */
   @state()
   private _displayState = {
     markers: [] as LiveMarker[],
+    /** Total time taken for the entire frame processing cycle (capture + inference + overhead). */
     tTotMs: 0,
+    /** Time spent by the worker on model inference for the last frame. */
     inferenceTimeMs: 0
   };
 
+  /** Reference to the video element used for frame capture. */
   @query('video')
   private _video!: HTMLVideoElement;
 
+  /** Flag to prevent overwhelming the background worker with redundant requests. */
   private _isWorkerBusy = false;
+  /** The classification Web Worker instance. */
   private _worker: Worker | null = null;
+  /** ID for the requestAnimationFrame loop. */
   private _loopId: number | null = null;
 
-  // time live-view was last updated
+  /** Timestamp of the last successful UI state update. */
   private _lastDisplayUpdateTime = 0;
 
-  // total time to grab and classify a frame
+  /** Timestamp of when the current frame capture began. Used for FPS and latency metrics. */
   private _frameStartTime = 0;
+  /** The total cycle time (latency + overhead) of the most recent frame. */
   private _tTotMs = 0;
 
   async connectedCallback() {
@@ -68,6 +90,9 @@ export class RrLiveView extends LitElement {
     this._terminateWorker();
   }
 
+  /**
+   * Initializes the Web Worker and sets up the message handler for classification results.
+   */
   private _initWorker() {
     if (this._worker) return;
     
@@ -98,6 +123,13 @@ export class RrLiveView extends LitElement {
       }
   }
 
+  /**
+   * Processes results arriving from the classification worker.
+   * Updates the throttled UI state if the refresh interval has elapsed.
+   * 
+   * @param results Map of marker ID to predicted label
+   * @param inferenceTimeMs Total time spent by the worker on model inference
+   */
   private _handleWorkerResults(results: Record<string, string>, inferenceTimeMs: number) {
       this._isWorkerBusy = false;
       
@@ -129,6 +161,9 @@ export class RrLiveView extends LitElement {
       }
   }
 
+  /**
+   * Requests camera access and attaches the stream to the hidden video element.
+   */
   private async _startCamera() {
     try {
       this._stream = await getCameraStream();
@@ -153,6 +188,11 @@ export class RrLiveView extends LitElement {
     }
   }
 
+  /**
+   * Starts the internal processing loop using requestAnimationFrame.
+   * The loop runs at the camera frame rate (e.g. 60fps) and captures a new frame 
+   * whenever the worker is idle.
+   */
   private _startLoop() {
     if (this._loopId) return;
 
@@ -182,6 +222,10 @@ export class RrLiveView extends LitElement {
     }
   }
 
+  /**
+   * Captures the current video frame as an ImageBitmap and transfers it 
+   * along with marker coordinates to the worker for classification.
+   */
   private async _sendFrameToWorker() {
     if (!this.manifest || !this.manifest.images || this.manifest.images.length === 0) return;
     if (!this._worker) return;
