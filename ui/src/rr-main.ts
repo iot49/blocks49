@@ -4,9 +4,18 @@ import { provide } from '@lit/context';
 import { R49File, r49FileContext } from './app/r49file.ts';
 import { Classifier, classifierContext } from './app/classifier.ts';
 
-
+/**
+ * RrMain is the root component of the application.
+ * 
+ * It manages the global application state and provides it to child components via context:
+ * 1. R49File: The active project file containing the manifest and images.
+ * 2. Classifier: The current ML model and precision used for inference.
+ * 
+ * It also handles the primary view routing between the Layout Editor and Live View modes.
+ */
 @customElement('rr-main')
 export class RrMain extends LitElement {
+  /** The active project file context. Provided to all child elements. */
   @provide({ context: r49FileContext })
   @state()
   private _r49File: R49File;
@@ -19,9 +28,14 @@ export class RrMain extends LitElement {
      This avoids recreating the R49File wrapper for every change.
   */
 
+  /** The active classifier instance. Provided to all child elements. */
   @provide({ context: classifierContext })
   @state()
   _classifier: Classifier | undefined;
+
+  /** Controls whether the app is in 'editor' (labeling/calibration) or 'live' (monitoring) mode. */
+  @state()
+  private _viewMode: 'editor' | 'live' = 'editor';
 
   constructor() {
     super();
@@ -29,6 +43,10 @@ export class RrMain extends LitElement {
     this._r49File.addEventListener('r49-file-changed', this._handleFileChange);
   }
 
+  /**
+   * Recreates the R49File wrapper when the underlying manifest or images change.
+   * This ensures a single stable reference for the Context while allowing state updates.
+   */
   private _handleFileChange = (_: Event) => {
     // Clean up old instance logic:
     // 1. Remove RrMain's listener
@@ -46,6 +64,9 @@ export class RrMain extends LitElement {
     this._r49File.addEventListener('r49-file-changed', this._handleFileChange);
   }
 
+  /**
+   * Responds to model or precision changes requested by child components (e.g. Settings).
+   */
   private _handleClassifierSettingsChange = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       const { model, precision } = detail;
@@ -59,8 +80,12 @@ export class RrMain extends LitElement {
       this._classifier = new Classifier(model, precision);
   }
 
-  @state()
-  private _viewMode: 'editor' | 'live' = 'editor';
+  /**
+   * Toggles between Editor and Live View modes.
+   */
+  private _handleViewToggle = () => {
+      this._viewMode = this._viewMode === 'editor' ? 'live' : 'editor';
+  };
 
   static styles = css`
     :host {
@@ -92,8 +117,4 @@ export class RrMain extends LitElement {
         }
     `;
   }
-  
-  private _handleViewToggle = () => {
-      this._viewMode = this._viewMode === 'editor' ? 'live' : 'editor';
-  };
 }
