@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import { type ApiLayout, type ApiImage, layoutClient } from "./client";
 import { load_r49_v2 } from "./load_r49_v2";
 import { LayoutImage } from "./layout-image";
+import { DB_COMMIT_TIMEOUT_MS } from "../app/config";
 
 export class Layout extends EventTarget {
 
@@ -21,9 +22,18 @@ export class Layout extends EventTarget {
     // Local state for images (blobs/urls)
     public _images: LayoutImage[] = []; // Public for load_r49_v2
 
-    constructor(data?: Partial<ApiLayout>) {
+    // Commit Timers
+    private _layoutCommitTimer: ReturnType<typeof setTimeout> | null = null;
+    private _markersCommitTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+
+    constructor(data?: Partial<ApiLayout> | Layout) {
         super();
-        if (data) {
+        if (data instanceof Layout) {
+            this._dataInternal = { ...data._dataInternal };
+            this._images = [...data._images];
+            this._layoutCommitTimer = data._layoutCommitTimer;
+            this._markersCommitTimers = new Map(data._markersCommitTimers);
+        } else if (data) {
             this._dataInternal = { ...this._dataInternal, ...data };
         }
     }
@@ -81,47 +91,67 @@ export class Layout extends EventTarget {
     }
 
     setCalibration(p1: Point, p2: Point) {
-        this._dataInternal.p1x = p1.x;
-        this._dataInternal.p1y = p1.y;
-        this._dataInternal.p2x = p2.x;
-        this._dataInternal.p2y = p2.y;
+        this._dataInternal = {
+            ...this._dataInternal,
+            p1x: p1.x,
+            p1y: p1.y,
+            p2x: p2.x,
+            p2y: p2.y
+        };
         
         this._emitChange();
+        this._resetLayoutTimer();
     }
     
     setName(name: string) {
-        this._dataInternal.name = name;
+        this._dataInternal = { ...this._dataInternal, name };
         this._emitChange();
+        this._resetLayoutTimer();
     }
 
     setScale(scale: string) {
         // TODO: Validate scale
-        this._dataInternal.scale = scale;
+        this._dataInternal = { ...this._dataInternal, scale };
         this._emitChange();
+        this._resetLayoutTimer();
     }
 
     setReferenceDistance(mm: number) {
-        this._dataInternal.referenceDistanceMm = mm;
+        this._dataInternal = { ...this._dataInternal, referenceDistanceMm: mm };
         this._emitChange();
+        this._resetLayoutTimer();
     }
 
     setMarker(imageIndex: number, id: string, x: number, y: number, type: string = 'track') {
         if (imageIndex < 0 || imageIndex >= this._dataInternal.images.length) return;
         
-        const img = this._dataInternal.images[imageIndex];
-        if (!img.labels) img.labels = {};
+        const newImages = [...this._dataInternal.images];
+        const img = { ...newImages[imageIndex] };
+        img.labels = { ...(img.labels || {}) };
         
         img.labels[id] = { id, x: Math.round(x), y: Math.round(y), type };
+        newImages[imageIndex] = img;
+        
+        this._dataInternal = { ...this._dataInternal, images: newImages };
+        
         this._emitChange();
+        this._resetMarkerTimer(img.id);
     }
 
     deleteMarker(imageIndex: number, id: string) {
         if (imageIndex < 0 || imageIndex >= this._dataInternal.images.length) return;
         
-        const img = this._dataInternal.images[imageIndex];
+        const newImages = [...this._dataInternal.images];
+        const img = { ...newImages[imageIndex] };
+        
         if (img.labels && img.labels[id]) {
+            img.labels = { ...img.labels };
             delete img.labels[id];
+            newImages[imageIndex] = img;
+            this._dataInternal = { ...this._dataInternal, images: newImages };
+            
             this._emitChange();
+            this._resetMarkerTimer(img.id);
         }
     }
 
@@ -330,6 +360,44 @@ export class Layout extends EventTarget {
             }),
         );
     }
+
+    private _resetLayoutTimer() {
+        if (this._layoutCommitTimer) clearTimeout(this._layoutCommitTimer);
+        this._layoutCommitTimer = setTimeout(() => this._commitLayout(), DB_COMMIT_TIMEOUT_MS);
+    }
+
+    private _resetMarkerTimer(imageId: string) {
+        const existing = this._markersCommitTimers.get(imageId);
+        if (existing) clearTimeout(existing);
+        
+        const timer = setTimeout(() => this._commitMarkers(imageId), DB_COMMIT_TIMEOUT_MS);
+        this._markersCommitTimers.set(imageId, timer);
+    }
+
+    private async _commitLayout() {
+        console.log(`[Layout] Committing layout metadata...`);
+        try {
+            const { images, ...metadata } = this._dataInternal;
+            await layoutClient.updateLayout(this.id, metadata);
+            this._layoutCommitTimer = null;
+        } catch (e) {
+            console.error("Failed to commit layout metadata", e);
+        }
+    }
+
+    private async _commitMarkers(imageId: string) {
+        console.log(`[Layout] Committing markers for image ${imageId}...`);
+        try {
+            const imgMeta = this._dataInternal.images.find(img => img.id === imageId);
+            if (imgMeta) {
+                await layoutClient.updateImage(imageId, { labels: imgMeta.labels });
+            }
+            this._markersCommitTimers.delete(imageId);
+        } catch (e) {
+            console.error(`Failed to commit markers for image ${imageId}`, e);
+        }
+    }
+
 }
 
 export interface Point {

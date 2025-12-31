@@ -38,7 +38,43 @@ async function ensureUserId(email: string): Promise<string> {
     return newId;
 }
 
-// GET /api/images/:id
+// PATCH /api/images/:id - Update Metadata (e.g., labels)
+app.patch('/:id', async (c) => {
+    const id = c.req.param('id');
+    const user = c.var.user;
+    const body = await c.req.json();
+    const db = getDb();
+
+    // 1. Get Image Metadata
+    const image = await db.select().from(images).where(eq(images.id, id)).get();
+    if (!image) return c.json({ error: 'Image not found' }, 404);
+
+    // 2. Auth Check (Must own layout)
+    if (user.role !== 'admin') {
+        const layout = await db.select().from(layouts).where(eq(layouts.id, image.layoutId!)).get();
+        const userId = await ensureUserId(user.email);
+        
+        if (!layout || layout.userId !== userId) {
+            return c.json({ error: 'Unauthorized' }, 403);
+        }
+    }
+
+    // 3. Perform Update
+    const updateData: any = {};
+    if (body.labels !== undefined) {
+        updateData.labels = body.labels;
+    }
+    // Add other fields if needed
+
+    const updated = await db.update(images)
+        .set(updateData)
+        .where(eq(images.id, id))
+        .returning()
+        .get();
+
+    return c.json({ image: updated });
+});
+
 app.get('/:id', async (c) => {
     const id = c.req.param('id');
     const user = c.var.user;

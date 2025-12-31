@@ -86,13 +86,23 @@ export class RrLayoutEditor extends LitElement {
       }
   }
 
-  private _handleLayoutDataChanged = () => {
-      console.log("[RrLayoutEditor] Layout data changed, resetting thumbnail index");
-      // Pick first image if available, else reset to -1
-      if (this.images.length > 0) {
-          this.currentImageIndex = 0;
-      } else {
-          this.currentImageIndex = -1;
+  private _handleLayoutDataChanged = (e: Event) => {
+      const newData = (e as CustomEvent).detail;
+      const oldData = this.layout.layout;
+
+      // Only reset the index if the layout ID changed (new project loaded)
+      // or if the number of images changed (image added/deleted).
+      // Marker movements should NOT reset the index.
+      const layoutIdChanged = newData.id !== oldData.id;
+      const imagesCountChanged = newData.images.length !== oldData.images.length;
+
+      if (layoutIdChanged || imagesCountChanged) {
+          console.log("[RrLayoutEditor] Layout or images changed, resetting thumbnail index");
+          if (this.images.length > 0) {
+              this.currentImageIndex = 0;
+          } else {
+              this.currentImageIndex = -1;
+          }
       }
   }
 

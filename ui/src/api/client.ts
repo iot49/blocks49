@@ -99,6 +99,17 @@ export class LayoutClient {
         return data.image;
     }
 
+    async updateImage(imageId: string, updates: Partial<ApiImage>): Promise<ApiImage> {
+        const res = await fetch(`${API_BASE}/images/${imageId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+        });
+        if (!res.ok) throw new Error('Failed to update image');
+        const data = await res.json();
+        return data.image;
+    }
+
     getImageUrl(imageId: string): string {
         return `${API_BASE}/images/${imageId}`;
     }

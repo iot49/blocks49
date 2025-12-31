@@ -34,3 +34,5 @@ export const CAMERA_PARAMS = {
 }
 
 export const LIVE_DISPLAY_UPDATE_INTERVAL_MS = 2000;
+
+export const DB_COMMIT_TIMEOUT_MS = 1500;

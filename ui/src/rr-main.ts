@@ -39,7 +39,7 @@ export class RrMain extends LitElement {
   constructor() {
     super();
     this._layout = new Layout();
-    this._layout.addEventListener('rr-layout-changed', this._handleFileChange);
+    this._layout.addEventListener('rr-layout-changed', this._handleLayoutChange);
   }
 
   /**
@@ -50,8 +50,14 @@ export class RrMain extends LitElement {
    * 
    * For now, we just force update.
    */
-  private _handleFileChange = (_: Event) => {
-      this.requestUpdate(); 
+  private _handleLayoutChange = (e: Event) => {
+      // Successive moves might still be firing on the old Layout instance 
+      // before the component re-renders with the new one.
+      // We clone the emitting instance to ensure we always have latest data.
+      const current = e.target as Layout;
+      const next = new Layout(current);
+      next.addEventListener('rr-layout-changed', this._handleLayoutChange);
+      this._layout = next;
   }
 
   /**

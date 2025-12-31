@@ -11,6 +11,13 @@ import { Classifier, classifierContext } from './app/classifier.ts';
 import { type ApiMarker } from './api/client.js';
 import { type Layout, layoutContext } from './api/layout.ts';
 
+/*
+TODO: investegate feasibility of proposed solution.
+BUG: marker position is not updated during drag, only on mouseup.
+SOLUTION: update immediately on mousemove, but delay database update.
+Changes to Layout (re)start a commitTimer (config.ts: DB_COMMIT_TIMEOUT_MS). The database updates only when the timer expires.
+*/
+
 
 interface ValidationResult {
   x: number;
@@ -313,7 +320,7 @@ export class RrLabel extends LitElement {
             width=${imageWidth}
             height=${imageHeight}
           ></image>
-          ${this.markerTemplate('label')} ${this.imageIndex === 0 ? this.rectTemplate() : svg``}
+          ${this.markerTemplate('label')} ${this.imageIndex === 0 ? this.calibrationTemplate() : svg``}
         </svg>
         <div id="debug-popup-container" 
              class="debug-popup"
@@ -363,7 +370,7 @@ export class RrLabel extends LitElement {
     `;
   }
 
-  private rectTemplate(handles = true) {
+  private calibrationTemplate(handles = true) {
     if (!this.layout) return svg``;
 
     const { p1, p2 } = this.layout.calibration;
@@ -455,11 +462,11 @@ export class RrLabel extends LitElement {
         return;
       }
       
-      const category: MarkerCategory = 'label';
+      const type = this.activeTool || 'track';
       const id = crypto.randomUUID();
 
       const screenCoords = this.toSVGPoint(event.clientX, event.clientY);
-      this.layout.setMarker(this.imageIndex, id, screenCoords.x, screenCoords.y, category);
+      this.layout.setMarker(this.imageIndex, id, screenCoords.x, screenCoords.y, type);
     } else {
       // finished dragging
       this.dragHandle = null;
@@ -493,6 +500,7 @@ export class RrLabel extends LitElement {
 
 
   private handleMouseMove = (event: MouseEvent) => {
+    // BUG: marker position is not updated when dragging 
     if (!this.dragHandle) return;
     const screenCoords = this.toSVGPoint(event.clientX, event.clientY);
 
