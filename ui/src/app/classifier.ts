@@ -4,7 +4,7 @@ import { createContext } from "@lit/context";
 // Configure WASM paths to use the CDN to avoid local serving issues with MIME types
 ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/';
 
-import type { Point } from './manifest';
+import type { Point } from '../api/layout';
 
 export type ModelPrecision = 'fp32' | 'fp16' | 'int8';
 

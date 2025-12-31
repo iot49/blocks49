@@ -1,14 +1,16 @@
 import { LitElement, html, css, svg } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { consume } from '@lit/context';
-import { Manifest, type MarkerCategory } from './app/manifest.ts';
-import { HEIGHT_COLOR, MARKER_SIZE_PX, WIDTH_COLOR } from './app/config.ts';
+
+import { MARKER_SIZE_PX, REF_LINE_COLOR } from './app/config.ts';
 
 
 import { getMarkerDefs } from './styles/marker-defs.ts';
 
-import { R49File, r49FileContext } from './app/r49file.ts';
 import { Classifier, classifierContext } from './app/classifier.ts';
+import { type ApiMarker } from './api/client.js';
+import { type Layout, layoutContext } from './api/layout.ts';
+
 
 interface ValidationResult {
   x: number;
@@ -21,6 +23,8 @@ interface ValidationResult {
       match: boolean;
   };
 }
+
+type MarkerCategory = 'label' | 'calibration';
 
 /**
  * RrLabel is an interactive canvas for viewing and labeling layout images.
@@ -70,20 +74,29 @@ export class RrLabel extends LitElement {
     }
   `;
 
-  @consume({ context: r49FileContext, subscribe: true })
-  @state()
-  r49File!: R49File;
+  @consume({ context: layoutContext, subscribe: true })
+  layout!: Layout;
 
   @consume({ context: classifierContext, subscribe: true })
   @state()
   classifier: Classifier | undefined;
 
-  get manifest(): Manifest {
-    return this.r49File?.manifest;
+
+
+  // Helper to ensure we have resolution if possible
+  get cameraResolution() {
+      // Use first image if available?
+      if (this.layout._images.length > 0) {
+           // We might not have bitmap loaded constantly. 
+           // We can't know resolution without loading image.
+           // This logic was brittle in Manifest too.
+           // For start, use default or try to get it from imageIndex.
+      }
+      return { width: 1000, height: 1000 };
   }
 
   // Derived from r49File context
-  // get imageUrl removed, use r49File.getImageUrl(index) directly
+  // get imageUrl removed, use r49File.getImageUrl(index) directly -> converted to layout.images[index].objectURL
 
   /** The currently selected image index. */
   @property({ type: Number })
@@ -136,12 +149,10 @@ export class RrLabel extends LitElement {
    * This ensures markers remain a consistent physical size regardless of resizing.
    */
   private updateSymbolSize() {
-    if (!this.manifest || !this.manifest.camera) return;
-
     const width = this.offsetWidth;
     if (width === 0) return; // not visible yet
 
-    const imageWidth = this.manifest.camera.resolution.width;
+    const imageWidth = this._imageBitmap?.width || 1000;
     // The SVG viewBox width matches imageWidth.
     // So the number of SVG units per screen pixel is imageWidth / screenWidth.
     const scale = imageWidth / width;
@@ -151,7 +162,7 @@ export class RrLabel extends LitElement {
 
   willUpdate(changedProperties: Map<string, any>) {
     // Recalculate symbol size if layout or file changes
-    if (changedProperties.has('r49File') || changedProperties.has('imageIndex') || changedProperties.has('classifier')) {
+    if (changedProperties.has('layout') || changedProperties.has('imageIndex') || changedProperties.has('classifier')) {
       this.updateSymbolSize();
       
       // If the image index or classifier changed, clear validation results.
@@ -172,7 +183,7 @@ export class RrLabel extends LitElement {
     if (
         changedProperties.has('classifier') || 
         changedProperties.has('_imageBitmap') ||
-        changedProperties.has('r49File') || // Added to handle marker movements
+        changedProperties.has('layout') || // Added to handle marker movements
         changedProperties.has('dragHandle')
     ) {
         if (this._imageBitmap && !this.dragHandle) {
@@ -182,16 +193,20 @@ export class RrLabel extends LitElement {
   }
 
   private async _updateImage() {
-    if (this.imageIndex < 0 || !this.r49File) {
+    if (this.imageIndex < 0 || !this.layout) {
         this.validationResults = {};
         this._imageBitmap = null;
         return;
     }
 
     try {
-        // R49Image handles caching bitmap internally, accessed via wrapper
-        const bitmap = await this.r49File.getImageBitmap(this.imageIndex);
-        this._imageBitmap = bitmap || null;
+        const layoutImg = this.layout.images[this.imageIndex];
+        if (layoutImg) {
+            const bitmap = await layoutImg.getBitmap();
+            this._imageBitmap = bitmap || null;
+        } else {
+            this._imageBitmap = null;
+        }
     } catch (e) {
         console.error("Failed to load image bitmap", e);
         this._imageBitmap = null;
@@ -204,11 +219,13 @@ export class RrLabel extends LitElement {
    */
   private async validateMarkers() {
     if (this.dragHandle) return;
+    const layout = this.layout;
+    if (!layout) return;
     const currentImageIndex = this.imageIndex;
-    const currentImage = this.manifest?.images[currentImageIndex];
+    const currentImage = layout.apiImages[currentImageIndex];
     if (!currentImage?.labels || !this._imageBitmap || !this.classifier) return;
     
-    const img_dpt = this.manifest.dots_per_track;
+    const img_dpt = layout.dots_per_track;
     if (img_dpt <= 0) return; 
 
     const labels = Object.entries(currentImage.labels);
@@ -216,7 +233,8 @@ export class RrLabel extends LitElement {
     const newResults = { ...this.validationResults };
 
     // Identify which markers need (re)validation
-    const tasks = labels.map(async ([id, marker]) => {
+    const tasks = labels.map(async ([id, m]) => {
+        const marker = m as ApiMarker;
         // Skip if we already have a valid result for this exact biomarker (type + pos)
         const prev = this.validationResults[id];
         if (prev && prev.x === marker.x && prev.y === marker.y && prev.type === marker.type) {
@@ -240,8 +258,8 @@ export class RrLabel extends LitElement {
             newResults[id] = { 
                x: marker.x, 
                y: marker.y, 
-               type: marker.type, 
-               match: predictedLabel === marker.type,
+               type: marker.type || 'track',
+               match: predictedLabel === (marker.type || 'track'),
                predicted: predictedLabel,
                comparison: undefined 
             };
@@ -272,9 +290,11 @@ export class RrLabel extends LitElement {
 
   render() {
     // Calculate the SVG viewBox to match image dimensions
-    const imageWidth = this.manifest.camera.resolution.width;
-    const imageHeight = this.manifest.camera.resolution.height;
+    // Use bitmap resolution if available, otherwise fallback/shim
+    const imageWidth = this._imageBitmap?.width || 1000;
+    const imageHeight = this._imageBitmap?.height || 1000;
     const viewBox = `0 0 ${imageWidth} ${imageHeight}`;
+    // Also use this for scale shim in updateSymbolSize if needed
 
     return html`
       <div style="position: relative; width: 100%; height: 100%;" @mousedown=${this.handleMouseDown}>
@@ -287,7 +307,7 @@ export class RrLabel extends LitElement {
           ${getMarkerDefs(this.symbolSize)}
           <image
             id="image"
-            href=${this.r49File?.getImageUrl(this.imageIndex)}
+            href=${this.layout?.images?.[this.imageIndex]?.objectURL}
             x="0"
             y="0"
             width=${imageWidth}
@@ -304,12 +324,14 @@ export class RrLabel extends LitElement {
   }
 
   private markerTemplate(category: MarkerCategory) {
-    if (!this.manifest.images[this.imageIndex]) return svg``;
-    const markers = this.manifest.images[this.imageIndex].labels || {};
-    console.log(`[rr-label] Rendering ${Object.keys(markers).length} markers for image ${this.imageIndex}`, markers);
+    if (!this.layout || !this.layout.apiImages[this.imageIndex]) return svg``;
+    const markers = this.layout.apiImages[this.imageIndex].labels || {};
+    // console.log(`[rr-label] Rendering ${Object.keys(markers).length} markers for image ${this.imageIndex}`, markers);
     return svg`
-      ${Object.entries(markers).map(([markerId, marker]) => {
+      ${Object.entries(markers).map(([markerId, m]) => {
+        const marker = m as ApiMarker; 
         const validation = this.validationResults[markerId];
+        // TODO: stroke width independent of container size
         const color = validation
           ? validation.match 
             ? (validation.comparison && !validation.comparison.match ? 'orange' : 'green') 
@@ -342,27 +364,19 @@ export class RrLabel extends LitElement {
   }
 
   private rectTemplate(handles = true) {
-    if (Object.keys(this.manifest.calibration || {}).length < 4) return svg``;
+    if (!this.layout) return svg``;
 
-    const {
-      'rect-0': rect0,
-      'rect-1': rect1,
-      'rect-2': rect2,
-      'rect-3': rect3,
-    } = this.manifest.calibration;
+    const { p1, p2 } = this.layout.calibration;
+    // Check for valid points check? Assuming layout provides {p1, p2}
+    if (!p1 || !p2) return svg``;
 
     return svg`
-      <line x1=${rect0.x} y1=${rect0.y} x2=${rect1.x} y2=${rect1.y} stroke=${WIDTH_COLOR} stroke-width="3" vector-effect="non-scaling-stroke" style="pointer-events: none;" />
-      <line x1=${rect1.x} y1=${rect1.y} x2=${rect3.x} y2=${rect3.y} stroke=${HEIGHT_COLOR} stroke-width="3" vector-effect="non-scaling-stroke" style="pointer-events: none;" />
-      <line x1=${rect3.x} y1=${rect3.y} x2=${rect2.x} y2=${rect2.y} stroke=${WIDTH_COLOR} stroke-width="3" vector-effect="non-scaling-stroke" style="pointer-events: none;" />
-      <line x1=${rect2.x} y1=${rect2.y} x2=${rect0.x} y2=${rect0.y} stroke=${HEIGHT_COLOR} stroke-width="3" vector-effect="non-scaling-stroke" style="pointer-events: none;" />
+      <line x1=${p1.x} y1=${p1.y} x2=${p2.x} y2=${p2.y} stroke=${REF_LINE_COLOR} stroke-width="3" vector-effect="non-scaling-stroke" style="pointer-events: none;" />
       ${
         handles
           ? svg`
-            <use id="rect-0" class="calibration" href="#drag-handle" x=${rect0.x} y=${rect0.y} />
-            <use id="rect-1" class="calibration" href="#drag-handle" x=${rect1.x} y=${rect1.y} />
-            <use id="rect-2" class="calibration" href="#drag-handle" x=${rect2.x} y=${rect2.y} />
-            <use id="rect-3" class="calibration" href="#drag-handle" x=${rect3.x} y=${rect3.y} />
+            <use id="p1" class="calibration" href="#drag-handle" x=${p1.x} y=${p1.y} />
+            <use id="p2" class="calibration" href="#drag-handle" x=${p2.x} y=${p2.y} />
           `
           : svg``
       }
@@ -391,7 +405,8 @@ export class RrLabel extends LitElement {
     }
 
     const img = this._imageBitmap;
-    const img_dpt = this.manifest.dots_per_track;
+    if (!this.layout) return;
+    const img_dpt = this.layout.dots_per_track;
     
     // --- Scaled Patch via Classifier.patch ---
     const img_patch = await this.classifier.patch(img, screenCoords, img_dpt);
@@ -408,7 +423,7 @@ export class RrLabel extends LitElement {
 
       const classifyPromise = this.classifier.classify(img, screenCoords, img_dpt);
       
-      classifyPromise.then((label) => {
+      classifyPromise.then((label: string) => {
         const resultDiv = document.createElement('div');
         resultDiv.style.background = '#e8f5e9';
         resultDiv.style.padding = '4px';
@@ -444,7 +459,7 @@ export class RrLabel extends LitElement {
       const id = crypto.randomUUID();
 
       const screenCoords = this.toSVGPoint(event.clientX, event.clientY);
-      this.manifest.setMarker(category, id, screenCoords.x, screenCoords.y, tool, this.imageIndex);
+      this.layout.setMarker(this.imageIndex, id, screenCoords.x, screenCoords.y, category);
     } else {
       // finished dragging
       this.dragHandle = null;
@@ -462,7 +477,7 @@ export class RrLabel extends LitElement {
 
     if (this.activeTool === 'delete') {
       if (classList.contains('label')) {
-        this.manifest.deleteMarker('label', id, this.imageIndex);
+        this.layout.deleteMarker(this.imageIndex, id);
       }
     } else {
       if (classList.contains('label')) {
@@ -482,26 +497,26 @@ export class RrLabel extends LitElement {
     const screenCoords = this.toSVGPoint(event.clientX, event.clientY);
 
     if (this.dragHandle.category === 'calibration') {
-      this.manifest.setMarker('calibration', this.dragHandle.id, screenCoords.x, screenCoords.y);
-    } else {
-      // Preserving the type is tricky here since we don't have it locally easily
-      // unless we look it up, but setMarker merges so type should be preserved if passed undefined
-      // However, setMarker signature currently expects type. Let's look it up.
-      let type = 'track';
-      if (
-        this.manifest.images[this.imageIndex] &&
-        this.manifest.images[this.imageIndex].labels[this.dragHandle.id]
-      ) {
-        type = this.manifest.images[this.imageIndex].labels[this.dragHandle.id].type;
+      const { p1, p2 } = this.layout.calibration;
+      if (this.dragHandle.id === 'p1') {
+          this.layout.setCalibration({ x: screenCoords.x, y: screenCoords.y }, p2);
+      } else if (this.dragHandle.id === 'p2') {
+          this.layout.setCalibration(p1, { x: screenCoords.x, y: screenCoords.y });
       }
-
-      this.manifest.setMarker(
-        this.dragHandle.category,
+    } else {
+      let type = 'track';
+      const img = this.layout.apiImages?.[this.imageIndex];
+      
+      if (img?.labels?.[this.dragHandle.id]) {
+        type = img.labels[this.dragHandle.id].type || 'track';
+      }
+      
+      this.layout.setMarker(
+        this.imageIndex,
         this.dragHandle.id,
         screenCoords.x,
         screenCoords.y,
-        type,
-        this.imageIndex,
+        type
       );
     }
   };

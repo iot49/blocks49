@@ -16,19 +16,16 @@ export const layouts = sqliteTable('layouts', {
   description: text('description'),
   
   // Calibration: 2-Point Line System
-  calibrationX1: real('cal_x1'),
-  calibrationY1: real('cal_y1'),
-  calibrationX2: real('cal_x2'),
-  calibrationY2: real('cal_y2'),
+  p1x: real('p1_x'),
+  p1y: real('p1_y'),
+  p2x: real('p2_x'),
+  p2y: real('p2_y'),
   
+  // Distance between calibration points (mm)
   referenceDistanceMm: real('ref_dist_mm'),
   
   // Scale (Enum: 'N', 'HO', 'Z', ...).
   scale: text('scale').default('HO'),
-  
-  width: real('width'),
-  height: real('height'),
-  calibration: text('calibration', { mode: 'json' }), // Stores Record<string, Point>
   
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
@@ -39,8 +36,6 @@ export const images = sqliteTable('images', {
     id: text('id').primaryKey(), // UUID
     layoutId: text('layout_id').references(() => layouts.id),
     filename: text('filename'),
-    width: integer('width'),
-    height: integer('height'),
     labels: text('labels', { mode: 'json' }), // Stores Record<string, Point & { type: string }>
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });

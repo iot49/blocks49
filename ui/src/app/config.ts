@@ -1,11 +1,11 @@
-export const TITLE = 'RR Labeler';
+export const TITLE = 'Train Detector';
 
 export const DEFAULT_MODEL = 'resnet18';
 export const DEFAULT_PRECISION = 'int8';
 
 export const MODEL_LIST = [
   'resnet18',
-  // 'mobilenetV2',
+  'mobilenetV2',
 ];
 
 export const PRECISION_OPTIONS = [
@@ -14,7 +14,7 @@ export const PRECISION_OPTIONS = [
   'int8',
 ];
 
-export const STANDARD_GAUGE = 1435; // spacing of standard railroad tracks (in Switzerland) [mm]
+export const STANDARD_GAUGE_MM = 1435; // spacing of standard railroad tracks (in Switzerland) [mm]
 export const DEFAULT_SCALE = 87;  // HO scale
 
 export const MARKER_SIZE_PX = 36;
@@ -24,8 +24,8 @@ export const LIVE_MARKER_SIZE = 80;
 export const DRAG_HANDLE_VISUAL_RADIUS = 0.1; // Visible size
 export const DRAG_HANDLE_INTERACTION_RADIUS = 2; // Larger interaction area
 
-export const WIDTH_COLOR = 'red';
-export const HEIGHT_COLOR = 'blue';
+// TODO: LENGTH_COLOR
+export const REF_LINE_COLOR = 'red';
 
 export const CAMERA_PARAMS = {
   facingMode: 'environment',

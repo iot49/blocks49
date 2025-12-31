@@ -1,14 +1,14 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { provide } from '@lit/context';
-import { R49File, r49FileContext } from './app/r49file.ts';
+import { Layout, layoutContext } from './api/layout';
 import { Classifier, classifierContext } from './app/classifier.ts';
 
 /**
  * RrMain is the root component of the application.
  * 
  * It manages the global application state and provides it to child components via context:
- * 1. R49File: The active project file containing the manifest and images.
+ * 1. Layout: The active project file containing the manifest and images.
  * 2. Classifier: The current ML model and precision used for inference.
  * 
  * It also handles the primary view routing between the Layout Editor and Live View modes.
@@ -16,16 +16,15 @@ import { Classifier, classifierContext } from './app/classifier.ts';
 @customElement('rr-main')
 export class RrMain extends LitElement {
   /** The active project file context. Provided to all child elements. */
-  @provide({ context: r49FileContext })
+  @provide({ context: layoutContext })
   @state()
-  private _r49File: R49File;
+  private _layout: Layout;
 
   /* 
      State Management:
-     We hold a stable `_r49File` instance and provide it via Context.
-     Consumers (rr-layout-editor, etc.) must listen to 'r49-file-changed' events 
+     We hold a stable `_layout` instance and provide it via Context.
+     Consumers (rr-layout-editor, etc.) must listen to 'rr-layout-changed' events 
      on this instance to trigger their own updates.
-     This avoids recreating the R49File wrapper for every change.
   */
 
   /** The active classifier instance. Provided to all child elements. */
@@ -39,29 +38,20 @@ export class RrMain extends LitElement {
 
   constructor() {
     super();
-    this._r49File = new R49File();
-    this._r49File.addEventListener('r49-file-changed', this._handleFileChange);
+    this._layout = new Layout();
+    this._layout.addEventListener('rr-layout-changed', this._handleFileChange);
   }
 
   /**
-   * Recreates the R49File wrapper when the underlying manifest or images change.
-   * This ensures a single stable reference for the Context while allowing state updates.
+   * Recreates the Layout wrapper when the underlying data changes significantly (optional).
+   * Note: Layout uses internal reactivity so we might not need to replace the instance always,
+   * but sticking to the pattern of immutability for Lit Context if deep properties change.
+   * However, Layout emits events.
+   * 
+   * For now, we just force update.
    */
   private _handleFileChange = (_: Event) => {
-    // Clean up old instance logic:
-    // 1. Remove RrMain's listener
-    this._r49File.removeEventListener('r49-file-changed', this._handleFileChange);
-    
-    // 2. Detach old instance from Manifest (stop it from listening)
-    // We use .detach() instead of .dispose() to PRESERVE the images/manifest for the new instance.
-    this._r49File.detach();
-
-    // 3. Create new instance (Copy Constructor)
-    // This new instance takes the Manifest and Images from the old one.
-    this._r49File = new R49File(this._r49File);
-    
-    // 4. Attach listener to new instance
-    this._r49File.addEventListener('r49-file-changed', this._handleFileChange);
+      this.requestUpdate(); 
   }
 
   /**
@@ -95,7 +85,7 @@ export class RrMain extends LitElement {
       const layoutId = detail.layoutId;
       console.log(`Loading layout: ${layoutId}`);
       if (layoutId) {
-          this._r49File.syncFromApi(layoutId).catch(err => {
+          this._layout.loadFromApi(layoutId).catch(err => {
               console.error("Failed to sync layout:", err);
               alert("Failed to load layout. See console.");
           });

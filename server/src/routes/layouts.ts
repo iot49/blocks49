@@ -5,7 +5,7 @@ import { eq, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 import { getDb } from '../db/index.js';
-import { layouts, images } from '../db/schema.js';
+import { layouts, images, users } from '../db/schema.js';
 import type { AuthUser } from '../middleware/auth.js';
 
 // Extend Hono environment to include AuthUser
@@ -16,6 +16,27 @@ type Env = {
 };
 
 const app = new Hono<Env>();
+
+// Helper to resolve User UUID from Email
+async function ensureUserId(email: string): Promise<string> {
+    const db = getDb();
+    const existing = await db.select().from(users).where(eq(users.email, email)).get();
+    
+    if (existing) {
+        return existing.id;
+    }
+
+    // Create if not exists
+    const newId = randomUUID();
+    await db.insert(users).values({
+        id: newId,
+        email: email,
+        role: 'user', // Default
+        createdAt: new Date()
+    });
+    console.log(`[Backend] Created new user reference for ${email} -> ${newId}`);
+    return newId;
+}
 
 // Schema for Creating/Updating Layouts
 const layoutSchema = z.object({
@@ -36,15 +57,9 @@ app.get('/', async (c) => {
     .orderBy(desc(layouts.updatedAt));
 
   if (user.role !== 'admin') {
-    query = query.where(eq(layouts.userId, user.email)) as any; // Using email as ID for now since auth middleware uses it. 
-    // TODO: In real app, we'd lookup User ID from email first or store UUID in JWT.
-    // For this mock phase, we'll assume user.email matches the inserted userId or we align them.
-    // Actually, in schema users.id is UUID. Let's fix this in follow-up to look up user.
+    const userId = await ensureUserId(user.email);
+    query = query.where(eq(layouts.userId, userId)) as any;
   }
-  
-  // For now in Local dev, we just return all because mock user might not match seed data UUIDs
-  // Let's constrain strictly for correctness:
-  // query.where(eq(layouts.userId, user.id)) <-- We need user.id in context!
   
   const results = await query.all();
   return c.json({ layouts: results });
@@ -56,16 +71,12 @@ app.post('/', zValidator('json', layoutSchema), async (c) => {
   const body = c.req.valid('json');
   const db = getDb();
   
+  const userId = await ensureUserId(user.email);
   const newId = randomUUID();
-  
-  // Create user record if not exists? Or assume existing?
-  // For speed, just insert.
   
   const newLayout = {
       id: newId,
-      userId: user.email, // Storing Email as ID for simplicity in this phase, or we need a lookup. 
-      // Schema says userId is reference to users.id (UUID). 
-      // We should probably ensure the User exists.
+      userId: userId, 
       name: body.name,
       description: body.description,
       scale: body.scale,
@@ -73,8 +84,6 @@ app.post('/', zValidator('json', layoutSchema), async (c) => {
       updatedAt: new Date()
   };
 
-  // Safe insert - simplified relation handling for MVP
-  // In a real app we'd `db.query.users.findFirst` by email to get UUID.
   await db.insert(layouts).values(newLayout as any); 
   
   return c.json({ layout: newLayout }, 201);
@@ -91,33 +100,32 @@ app.get('/:id', async (c) => {
     if (!layout) return c.json({ error: 'Not found' }, 404);
 
     // 2. Verify Ownership
-    if (user.role !== 'admin' && layout.userId !== user.email) {
-        return c.json({ error: 'Unauthorized' }, 403);
+    if (user.role !== 'admin') {
+        const userId = await ensureUserId(user.email);
+        if (layout.userId !== userId) {
+             return c.json({ error: 'Unauthorized' }, 403);
+        }
     }
     
     // 3. Get Images
     const layoutImages = await db.select().from(images).where(eq(images.layoutId, id)).all();
-    console.log(`[Backend] GET layout ${id} returned ${layoutImages.length} images.`);
-    layoutImages.forEach((img, idx) => {
-        console.log(`[Backend] Image ${idx} (${img.id}) labels:`, JSON.stringify((img as any).labels));
-    });
-
+    
     return c.json({ layout: { ...layout, images: layoutImages } });
 });
 
+// Schema for Partial Updates
 // Schema for Partial Updates
 const patchLayoutSchema = z.object({
     name: z.string().min(1).optional(),
     description: z.string().optional(),
     scale: z.enum(['N', 'HO', 'Z', 'O', 'G']).optional(),
-    calibrationX1: z.number().optional(),
-    calibrationY1: z.number().optional(),
-    calibrationX2: z.number().optional(),
-    calibrationY2: z.number().optional(),
+    p1x: z.number().optional(),
+    p1y: z.number().optional(),
+    p2x: z.number().optional(),
+    p2y: z.number().optional(),
     referenceDistanceMm: z.number().optional(),
     width: z.number().optional(),
     height: z.number().optional(),
-    calibration: z.record(z.string(), z.any()).optional(), // Flexible JSON object
 });
 
 // PATCH /api/layouts/:id - Update
@@ -130,13 +138,15 @@ app.patch('/:id', zValidator('json', patchLayoutSchema), async (c) => {
     // 1. Verify Existence & Ownership
     const layout = await db.select().from(layouts).where(eq(layouts.id, id)).get();
     if (!layout) return c.json({ error: 'Not found' }, 404);
-    if (user.role !== 'admin' && layout.userId !== user.email) {
-        return c.json({ error: 'Unauthorized' }, 403);
+    
+    if (user.role !== 'admin') {
+        const userId = await ensureUserId(user.email);
+        if (layout.userId !== userId) {
+            return c.json({ error: 'Unauthorized' }, 403);
+        }
     }
 
     // 2. Perform Update
-    // Filter out undefined keys from body to avoid overwriting with null/default if logic differed
-    // Drizzle's `set` handles partial objects well.
     const updateData = {
         ...body,
         updatedAt: new Date(),

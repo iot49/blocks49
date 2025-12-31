@@ -2,8 +2,7 @@ import { LIVE_DISPLAY_UPDATE_INTERVAL_MS, LIVE_MARKER_SIZE } from './app/config.
 import { LitElement, html, css, svg } from 'lit';
 import { customElement, state, query } from 'lit/decorators.js';
 import { consume } from '@lit/context';
-import { Manifest } from './app/manifest.ts';
-import { R49File, r49FileContext } from './app/r49file.ts';
+import { type Layout, layoutContext } from './api/layout.ts';
 import { Classifier, classifierContext } from './app/classifier.ts';
 import { statusBarStyles } from './styles/status-bar.ts';
 import { getMarkerDefs } from './styles/marker-defs.ts';
@@ -29,20 +28,18 @@ interface LiveMarker {
  * 
  * Public Interface:
  * - classifier: The current active Classifier instance (FP32/FP16/Int8).
- * - r49File: The active project context.
+ * - layout: The active project context.
  */
 @customElement('rr-live-view')
 export class RrLiveView extends LitElement {
-  @consume({ context: r49FileContext, subscribe: true })
-  r49File!: R49File;
+  @consume({ context: layoutContext, subscribe: true })
+  layout!: Layout;
 
   @consume({ context: classifierContext, subscribe: true })
   @state()
   classifier: Classifier | undefined;
 
-  get manifest(): Manifest {
-    return this.r49File?.manifest;
-  }
+
 
   /** The media stream from the camera. Used for teardown. */
   private _stream: MediaStream | null = null;
@@ -135,7 +132,7 @@ export class RrLiveView extends LitElement {
   private _handleWorkerResults(results: Record<string, string>, inferenceTimeMs: number, executionProvider: string) {
       this._isWorkerBusy = false;
       
-      const labels = this.manifest?.images?.[0]?.labels;
+      const labels = this.layout?.apiImages?.[0]?.labels;
       if (!labels) return;
 
       const classificationResults: LiveMarker[] = Object.entries(results).map(([id, prediction]) => ({
@@ -230,13 +227,13 @@ export class RrLiveView extends LitElement {
    * along with marker coordinates to the worker for classification.
    */
   private async _sendFrameToWorker() {
-    if (!this.manifest || !this.manifest.images || this.manifest.images.length === 0) return;
+    if (!this.layout || !this.layout.apiImages || this.layout.apiImages.length === 0) return;
     if (!this._worker) return;
 
-    const labels = this.manifest.images[0].labels;
+    const labels = this.layout.apiImages[0].labels;
     if (!labels) return;
 
-    const dpt = this.manifest.dots_per_track;
+    const dpt = this.layout.dots_per_track;
     if (dpt <= 0) return;
 
     this._isWorkerBusy = true;
@@ -275,8 +272,8 @@ export class RrLiveView extends LitElement {
     const h = this._video?.videoHeight || 100;
 
     // Calculate scale factors for rendering
-    const manifestW = this.manifest?.camera.resolution.width || w;
-    const manifestH = this.manifest?.camera.resolution.height || h;
+    const manifestW = 1000;
+    const manifestH = 1000;
     const scaleX = w / manifestW;
     const scaleY = h / manifestH;
 

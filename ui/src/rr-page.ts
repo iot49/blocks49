@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { railsClient, type ApiLayout } from './api/client.js';
+import { layoutClient, type ApiLayout } from './api/client.js';
 import '@shoelace-style/shoelace/dist/components/dialog/dialog.js';
 import '@shoelace-style/shoelace/dist/components/select/select.js';
 import '@shoelace-style/shoelace/dist/components/option/option.js';
@@ -88,7 +88,7 @@ export class RrPage extends LitElement {
 
   async firstUpdated() {
       try {
-          this.layouts = await railsClient.listLayouts();
+          this.layouts = await layoutClient.listLayouts();
           if (this.layouts.length > 0) {
               this.selectedLayoutId = this.layouts[0].id;
               // We should notify parent or context of initial selection?
@@ -146,7 +146,7 @@ export class RrPage extends LitElement {
 
   private async _fetchLayouts() {
       try {
-          this.layouts = await railsClient.listLayouts();
+          this.layouts = await layoutClient.listLayouts();
       } catch(e) {
           console.error("Failed to refresh layouts", e);
       }

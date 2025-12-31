@@ -1,39 +1,47 @@
+export type UUID = string;
+
 export interface ApiLayout {
-    id: string;
-    userId: string;
+    id: UUID;
+    userId: UUID;
     name: string;
     description?: string;
     scale: string;
-    width?: number;
-    height?: number;
-    // Calibration
-    calibration?: Record<string, any>;
-    // Legacy/Alternative Calibration (backend managed)
-    calibrationX1?: number;
-    calibrationY1?: number;
-    calibrationX2?: number;
-    calibrationY2?: number;
-    referenceDistanceMm?: number;
-    standardGaugeMm?: number; // Derived on backend, but we might want it here if returned
+    
+    // Calibration Points
+    p1x?: number;
+    p1y?: number;
+    p2x?: number;
+    p2y?: number;
+    referenceDistanceMm?: number;  // Distance between calibration points (mm)
+    
+    // Derived/Backend fields (standardGaugeMm excluded)
     images: ApiImage[];
+    
     createdAt: string; // ISO Date
     updatedAt: string;
 }
 
 export interface ApiImage {
-    id: string;
-    layoutId: string;
+    id: UUID;
+    layoutId: UUID;
+    // TODO: remove field - this is id.jpg
     filename: string;
-    width: number;
-    height: number;
-    labels?: Record<string, any>;
+    labels?: Record<string, ApiMarker>;
     createdAt: string;
 }
 
+export interface ApiMarker {
+    id: UUID,
+    x: number,
+    y: number,
+    type?: string,
+}
+
+
 const API_BASE = '/api';
 
-export class RailsClient {
-    
+export class LayoutClient {
+
     async listLayouts(): Promise<ApiLayout[]> {
         const res = await fetch(`${API_BASE}/layouts`);
         if (!res.ok) throw new Error('Failed to fetch layouts');
@@ -55,12 +63,13 @@ export class RailsClient {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, scale })
         });
+        // TODO: more descriptive error message (also for other Errors in app)
         if (!res.ok) throw new Error('Failed to create layout');
         const data = await res.json();
-        
+
         return data.layout;
     }
-    
+
     async updateLayout(id: string, updates: Partial<ApiLayout>): Promise<ApiLayout> {
         const res = await fetch(`${API_BASE}/layouts/${id}`, {
             method: 'PATCH',
@@ -79,20 +88,20 @@ export class RailsClient {
         if (labels) {
             formData.append('labels', JSON.stringify(labels));
         }
-        
+
         const res = await fetch(`${API_BASE}/layouts/${layoutId}/images`, {
             method: 'POST',
             body: formData
         });
-        
+
         if (!res.ok) throw new Error('Failed to upload image');
         const data = await res.json();
         return data.image;
     }
-    
+
     getImageUrl(imageId: string): string {
         return `${API_BASE}/images/${imageId}`;
     }
 }
 
-export const railsClient = new RailsClient();
+export const layoutClient = new LayoutClient();

@@ -1,12 +1,10 @@
 import { consume } from '@lit/context';
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { Manifest, Scale2Number } from './app/manifest.ts';
-import { R49File, r49FileContext } from './app/r49file.ts';
-import { railsClient } from './api/client.js';
+import { Layout, layoutContext, Scale2Number } from './api/layout';
+import { layoutClient } from './api/client.js';
 import { 
-  HEIGHT_COLOR, 
-  WIDTH_COLOR, 
+  REF_LINE_COLOR, 
   MODEL_LIST, 
   PRECISION_OPTIONS,
   DEFAULT_MODEL,
@@ -16,6 +14,10 @@ import {
 
 @customElement('rr-settings')
 export class RrSettings extends LitElement {
+  // Styles omitted (static styles = ...) - assuming replace_file_content preserves if I don't touch? 
+  // Wait, I must provide replacement for range. I will target specific blocks or replace file if mostly changed.
+  // I will use multi_replace for safer editing.
+  
   static styles = css`
     :host {
       display: block;
@@ -65,9 +67,8 @@ export class RrSettings extends LitElement {
     }
   `;
 
-  @consume({ context: r49FileContext, subscribe: true })
-  @state()
-  r49File!: R49File;
+  @consume({ context: layoutContext, subscribe: true })
+  layout!: Layout;
 
   @state()
   private _selectedModel: string = DEFAULT_MODEL;
@@ -82,9 +83,12 @@ export class RrSettings extends LitElement {
   @state()
   private _newLayoutScale: string = 'HO';
 
-  get manifest(): Manifest {
-    return this.r49File?.manifest;
-  }
+  // Helper getters
+  get layoutName() { return this.layout?.layout?.name || ''; }
+  get layoutScale() { return this.layout?.layout?.scale || 'HO'; }
+  // Backend uses referenceDistanceMm.
+  get layoutReferenceDistance() { return this.layout?.layout?.referenceDistanceMm || 0; }
+  get cameraResolution() { return { width: 0, height: 0 }; } // Stub implementation
 
   connectedCallback() {
       super.connectedCallback();
@@ -156,44 +160,38 @@ export class RrSettings extends LitElement {
   }
 
   private _renderLayoutSettings() {
+    // TODO: replace width/heightwith referenceDistanceMm
     return html`
       <div class="settings-table">
         <div class="settings-row">
           <div class="settings-label">Name:</div>
           <div class="settings-field">
             <sl-input
-              value=${this.manifest.layout.name || ''}
+              value=${this.layoutName}
               @sl-input=${this._handleLayoutNameChange}
             >
             </sl-input>
           </div>
         </div>
         <div class="settings-row">
-          <div class="settings-label" style="color: ${WIDTH_COLOR}">Width in mm:</div>
+          <div class="settings-label" style="color: ${REF_LINE_COLOR}">Reference Dist (mm):</div>
           <div class="settings-field">
             <sl-input
               type="number"
-              value=${this.manifest.layout.size.width ?? ''}
-              @sl-change=${this._handleWidthChange}
+              value=${this.layoutReferenceDistance}
+              @sl-change=${this._handleReferenceDistanceChange}
             ></sl-input>
           </div>
         </div>
         <div class="settings-row">
-          <div class="settings-label" style="color: ${HEIGHT_COLOR}">Height in mm:</div>
-          <div class="settings-field">
-            <sl-input
-              type="number"
-              value=${this.manifest.layout.size.height ?? ''}
-              @sl-input=${this._handleHeightChange}
-            ></sl-input>
-          </div>
+           <!-- Placeholder for eventual other settings -->
         </div>
         <div class="settings-row">
           <div class="settings-label">Scale:</div>
           <div class="settings-field">
             <sl-dropdown>
               <sl-button class="scale" slot="trigger" caret>
-                ${this.manifest.layout.scale}
+                ${this.layoutScale}
               </sl-button>
               <sl-menu @sl-select=${this._handleScaleSelect}>
                 ${Object.keys(Scale2Number).map(
@@ -255,11 +253,15 @@ export class RrSettings extends LitElement {
       `;
   }
 
+  // TODO: backup & restore layouts
+
+  // TODO: replace with NewLayoutTool in rr-layout-editor. 
+  // TODO: a way to delete layouts
   private async _handleCreateLayout() {
     console.log("Creating layout", this._newLayoutName, this._newLayoutScale);
       if (!this._newLayoutName) return alert("Name required");
       try {
-          const layout = await railsClient.createLayout(this._newLayoutName, this._newLayoutScale);
+          const layout = await layoutClient.createLayout(this._newLayoutName, this._newLayoutScale);
           // Dispatch selection
           this.dispatchEvent(new CustomEvent('layout-selected', { 
               detail: { layoutId: layout.id },
@@ -289,38 +291,18 @@ export class RrSettings extends LitElement {
 
   private _handleLayoutNameChange(event: Event) {
     const input = event.target as HTMLInputElement;
-    this.manifest.setLayout({ ...this.manifest.layout, name: input.value });
+    this.layout.setName(input.value);
   }
 
   private _handleScaleSelect(event: Event) {
     const menuItem = (event as CustomEvent).detail.item;
-    const scale = menuItem.value as keyof typeof Scale2Number;
-    this.manifest.setLayout({ ...this.manifest.layout, scale: scale });
+    const scale = menuItem.value as string;
+    this.layout.setScale(scale);
   }
 
-  private _handleWidthChange(event: Event) {
+  private _handleReferenceDistanceChange(event: Event) {
     const input = event.target as HTMLInputElement;
-    const width = parseFloat(input.value) || 0;
-
-    // estimate height from image aspect ratio (if not set by user)
-    const aspect_ratio =
-      this.manifest.camera.resolution.height / this.manifest.camera.resolution.width;
-    const height = this.manifest.layout.size.height
-      ? this.manifest.layout.size.height
-      : Math.round(width * aspect_ratio);
-
-    this.manifest.setLayout({
-      ...this.manifest.layout,
-      size: { width: width, height: height },
-    });
-  }
-
-  private _handleHeightChange(event: Event) {
-    const input = event.target as HTMLInputElement;
-    const height = parseFloat(input.value) || 0;
-    this.manifest.setLayout({
-      ...this.manifest.layout,
-      size: { ...this.manifest.layout.size, height },
-    });
+    const dist = parseFloat(input.value) || 0;
+    this.layout.setReferenceDistance(dist);
   }
 }

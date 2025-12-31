@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getDb } from '../db/index.js';
-import { images, layouts } from '../db/schema.js';
+import { images, layouts, users } from '../db/schema.js';
 import type { AuthUser } from '../middleware/auth.js';
 import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -25,6 +25,26 @@ async function ensureDir() {
     await mkdir(STORAGE_DIR, { recursive: true });
 }
 
+// Helper to resolve User UUID from Email (duplicated to avoid refactor overhead)
+async function ensureUserId(email: string): Promise<string> {
+    const db = getDb();
+    const existing = await db.select().from(users).where(eq(users.email, email)).get();
+    
+    if (existing) {
+        return existing.id;
+    }
+
+    // Create if not exists
+    const newId = randomUUID();
+    await db.insert(users).values({
+        id: newId,
+        email: email,
+        role: 'user', // Default
+        createdAt: new Date()
+    });
+    return newId;
+}
+
 // POST /api/layouts/:layoutId/images
 app.post('/:layoutId/images', async (c) => {
     const layoutId = c.req.param('layoutId');
@@ -34,8 +54,12 @@ app.post('/:layoutId/images', async (c) => {
     // 1. Verify Layout Ownership
     const layout = await db.select().from(layouts).where(eq(layouts.id, layoutId)).get();
     if (!layout) return c.json({ error: 'Layout not found' }, 404);
-    if (user.role !== 'admin' && layout.userId !== user.email) {
-        return c.json({ error: 'Unauthorized' }, 403);
+    
+    if (user.role !== 'admin') {
+        const userId = await ensureUserId(user.email);
+        if (layout.userId !== userId) {
+            return c.json({ error: 'Unauthorized' }, 403);
+        }
     }
 
     // 2. Parse Body (Multipart)
@@ -72,8 +96,6 @@ app.post('/:layoutId/images', async (c) => {
         id: imageId,
         layoutId: layout.id,
         filename: file.name,
-        width: 0, // Placeholder, real app would read metadata
-        height: 0,
         labels: labelsJson,
         createdAt: new Date()
     };
