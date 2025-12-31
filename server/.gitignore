@@ -1,2 +1,5 @@
+node_modules
 data/images
-data.db
+data.db*
+test-data.db*
+tmp/

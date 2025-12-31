@@ -30,6 +30,11 @@ app.use('/api/*', authMiddleware);
 app.route('/api/layouts', layoutRoutes);
 app.route('/api/layouts', layoutImageRoutes); // Adds POST /api/layouts/:id/images
 app.route('/api/images', imageRoutes); // Adds GET /api/images/:id
+app.onError((err, c) => {
+  console.error(`[App Error] ${err.message}`);
+  console.error(err.stack);
+  return c.json({ error: 'Internal Server Error', message: err.message }, 500);
+});
 
 
 export default app;

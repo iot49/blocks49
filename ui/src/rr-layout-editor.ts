@@ -1,17 +1,12 @@
 import { LitElement, html } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { consume } from '@lit/context';
-
 import { captureImage } from './app/capture.ts';
-
-
-
 import { Layout, layoutContext } from './api/layout';
-
-
 import { layoutEditorStyles } from './styles/layout-editor.ts';
-
 import { statusBarStyles } from './styles/status-bar.ts';
+
+import { layoutClient, type ApiLayout } from './api/client.js';
 
 /**
  * RrLayoutEditor is the primary workspace for creating and editing model railroad layouts.
@@ -29,27 +24,31 @@ export class RrLayoutEditor extends LitElement {
   @consume({ context: layoutContext, subscribe: true })
   layout!: Layout;
 
+  @state()
+  private _layouts: ApiLayout[] = [];
+
+
   // Convenience getter
   get manifest() {
-      // Compatibility shim: return structure expected by existing code if possible
-      // But ideally we migrate usage.
-      // Existing code expects: this.manifest.layout, this.manifest.images, etc.
-      // Layout has .layout getter returning ApiLayout
-      // We can map it.
-      return {
-          layout: this.layout.layout,
-          images: this.layout.apiImages,
-          dots_per_track: this.layout.dots_per_track,
-          // Camera resolution? Layout doesn't have it explicitly yet, maybe in size?
-          // Using any cast to bypass for now or stubbing.
-          camera: { resolution: { width: 0, height: 0 } }
-      };
+    // Compatibility shim: return structure expected by existing code if possible
+    // But ideally we migrate usage.
+    // Existing code expects: this.manifest.layout, this.manifest.images, etc.
+    // Layout has .layout getter returning ApiLayout
+    // We can map it.
+    return {
+      layout: this.layout.layout,
+      images: this.layout.apiImages,
+      dots_per_track: this.layout.dots_per_track,
+      // Camera resolution? Layout doesn't have it explicitly yet, maybe in size?
+      // Using any cast to bypass for now or stubbing.
+      camera: { resolution: { width: 0, height: 0 } }
+    };
   }
 
   get images(): { filename: string, labels: any }[] {
     return this.layout.apiImages.map(img => ({
-        filename: img.filename,
-        labels: img.labels || {}
+      filename: img.filename,
+      labels: img.labels || {}
     }));
   }
 
@@ -66,20 +65,102 @@ export class RrLayoutEditor extends LitElement {
     layoutEditorStyles
   ];
 
+  connectedCallback() {
+      super.connectedCallback();
+      this.addEventListener('layout-selected', this._onLayoutSelected);
+      
+      // Listen for data changes in the consumed layout instance
+      if (this.layout) {
+          this.layout.addEventListener('rr-layout-changed', this._handleLayoutDataChanged);
+      }
+      
+      this._fetchLayouts();
+  }
+
+  disconnectedCallback() {
+      super.disconnectedCallback();
+      this.removeEventListener('layout-selected', this._onLayoutSelected);
+      
+      if (this.layout) {
+          this.layout.removeEventListener('rr-layout-changed', this._handleLayoutDataChanged);
+      }
+  }
+
+  private _handleLayoutDataChanged = () => {
+      console.log("[RrLayoutEditor] Layout data changed, resetting thumbnail index");
+      // Pick first image if available, else reset to -1
+      if (this.images.length > 0) {
+          this.currentImageIndex = 0;
+      } else {
+          this.currentImageIndex = -1;
+      }
+  }
+
+  private _onLayoutSelected = async () => {
+      // Proactively reset index to show loading/empty state
+      this.currentImageIndex = -1;
+      await this._fetchLayouts();
+  }
+
+  private async _fetchLayouts() {
+      try {
+          this._layouts = await layoutClient.listLayouts();
+      } catch (e) {
+          console.error("Failed to list layouts", e);
+      }
+  }
+
+  private _handleLayoutChange(e: CustomEvent) {
+      const select = e.target as any;
+      const layoutId = select.value;
+      this.dispatchEvent(new CustomEvent('layout-selected', { 
+          detail: { layoutId },
+          bubbles: true, 
+          composed: true 
+      }));
+  }
+
+
   protected async firstUpdated() {
     try {
-      if (this.images.length > 0) return;
+      // 1. Fetch available layouts
+      await this._fetchLayouts();
 
-      // TODO: better way to handle this? Add to database? Or just remove?
-      // Load default demo.r49 from server (not disk) if no images are present in R49File
+      // 2. Priority Logic:
+      // a. Is there a layout named "demo"?
+      const demoLayout = this._layouts.find(l => l.name === 'demo');
+      if (demoLayout) {
+          console.log(`[Startup] Found demo layout: ${demoLayout.id}`);
+          this._selectLayout(demoLayout.id);
+          return;
+      }
+
+      // b. Are there any other layouts?
+      if (this._layouts.length > 0) {
+          const firstLayout = this._layouts[0];
+          console.log(`[Startup] Selecting most recent layout: ${firstLayout.id}`);
+          this._selectLayout(firstLayout.id);
+          return;
+      }
+
+      // c. Backend is empty, load demo.r49
+      console.log("[Startup] Backend is empty. Loading demo.r49...");
       const response = await fetch('demo.r49');
       if (!response.ok) return;
       const blob = await response.blob();
       const file = new File([blob], 'demo.r49', { type: 'application/zip' });
-      this._load_r49(file);
+      await this._load_r49(file);
     } catch (e) {
-      console.warn('Failed to load demo.r49', e);
+      console.warn('Failed to initialize layout', e);
     }
+  }
+
+  private _selectLayout(layoutId: string) {
+      this.dispatchEvent(new CustomEvent('layout-selected', { 
+          detail: { layoutId },
+          bubbles: true, 
+          composed: true 
+      }));
   }
 
   render() {
@@ -89,9 +170,31 @@ export class RrLayoutEditor extends LitElement {
     // Editor Mode Status
     const layout = this.manifest.layout;
     const dpt = this.manifest.dots_per_track;
+    const allLayouts = [...this._layouts];
+    if (!allLayouts.find(l => l.id === this.layout.id)) {
+        allLayouts.push({
+            id: this.layout.id,
+            name: this.layout.name,
+            scale: this.layout.layout.scale,
+            userId: "",
+            images: [],
+            createdAt: this.layout.layout.createdAt || "",
+            updatedAt: this.layout.layout.updatedAt || ""
+        });
+    }
+
     const statusTemplate = html`
       <div slot="status" class="status-bar">
-          <span style="font-weight: bold; font-size: var(--sl-font-size-medium);">${layout.name || 'Untitled Layout'}</span>
+          <sl-select 
+              hoist 
+              value=${this.layout.id} 
+              @sl-change=${this._handleLayoutChange}
+              style="width: 200px; --sl-input-border-width: 0; --sl-input-background-color: transparent; --sl-input-color: white; font-weight: bold; font-size: var(--sl-font-size-medium);"
+          >
+              ${allLayouts.map(l => html`
+                  <sl-option value=${l.id}>${l.name}</sl-option>
+              `)}
+          </sl-select>
           <span>Scale: ${layout.scale}</span>
           <span>Ref Dist: ${layout.referenceDistanceMm ? layout.referenceDistanceMm.toFixed(0) : '?'} mm</span>
           <span>Resolution: ${dpt > 0 ? dpt.toFixed(2) + ' dpt' : 'Not Calibrated'}</span>
@@ -107,8 +210,8 @@ export class RrLayoutEditor extends LitElement {
           ${this._thumbnailBarTemplate()}
           <main>
             ${this.currentImageIndex >= 0
-            ? this._renderMainContent()
-            : html``}
+        ? this._renderMainContent()
+        : html``}
           </main>
           </div>
         </div>
@@ -129,7 +232,7 @@ export class RrLayoutEditor extends LitElement {
     return html`
       <div class="thumbnails">
         ${this.images.map(
-          (_, index) => html`
+      (_, index) => html`
             <div class="thumbnail-wrapper">
               <img
                 src="${this.layout.images[index]?.objectURL}"
@@ -141,7 +244,7 @@ export class RrLayoutEditor extends LitElement {
               </div>
             </div>
           `,
-        )}
+    )}
         <div class="add-image-btn" @click=${() => this._handleAddImageClick('camera')}>
           <sl-icon name="camera"></sl-icon>
         </div>
@@ -225,9 +328,22 @@ export class RrLayoutEditor extends LitElement {
     try {
       await this.layout.load(file);
       this.currentImageIndex = 0;
+
+      // Ensure the auto-loaded demo is named "demo" as per requirement
+      if (file.name === 'demo.r49') {
+          this.layout.setName('demo');
+      }
+
+      // Auto-migrate to backend
+      console.log("Auto-migrating loaded layout to backend...");
+      const newId = await this.layout.migrateToBackend();
       
-      // Removed auto-migration for now as Layout doesn't implement it yet.
-      // This will just load it into local memory view.
+      // Dispatch event to sync and refresh UI
+      this.dispatchEvent(new CustomEvent('layout-selected', { 
+          detail: { layoutId: newId },
+          bubbles: true, 
+          composed: true 
+      }));
     } catch (e) {
       alert(`Error loading file: ${(e as Error).message}`);
       console.error(e);
@@ -236,20 +352,20 @@ export class RrLayoutEditor extends LitElement {
 
   private async _load_imgfile(file: File) {
     try {
-        // We'll rely on Layout to handle adding images. 
-        // Layout currently has `addImage` but it takes LayoutImage.
-        // We need a helper or Layout should accept File.
-        // For now:
-        const { LayoutImage } = await import('./api/layout-image');
-        const img = new LayoutImage(file, file.name);
-        // validate? R49File did validation. Layout.addImage doesn't validation yet.
-        this.layout.addImage(img);
+      // We'll rely on Layout to handle adding images. 
+      // Layout currently has `addImage` but it takes LayoutImage.
+      // We need a helper or Layout should accept File.
+      // For now:
+      const { LayoutImage } = await import('./api/layout-image');
+      const img = new LayoutImage(file, file.name);
+      // validate? R49File did validation. Layout.addImage doesn't validation yet.
+      this.layout.addImage(img);
 
-        // Switch to the new image
-        const newIndex = this.images.length - 1;
-        this.currentImageIndex = newIndex;
+      // Switch to the new image
+      const newIndex = this.images.length - 1;
+      this.currentImageIndex = newIndex;
     } catch (e) {
-        alert((e as Error).message);
+      alert((e as Error).message);
     }
   }
 
@@ -295,7 +411,7 @@ export class RrLayoutEditor extends LitElement {
     // Remove image from array
     // Remove image using Layout method
     this.layout.removeImage(index);
-    
+
     // Request update to refresh UI
     this.requestUpdate();
     // Context update handles re-render

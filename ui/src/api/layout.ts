@@ -28,6 +28,7 @@ export class Layout extends EventTarget {
         }
     }
 
+    get id(): string { return this._dataInternal.id; }
     get layout(): ApiLayout { return this._dataInternal; }
     
     get name(): string { return this._dataInternal.name; }
