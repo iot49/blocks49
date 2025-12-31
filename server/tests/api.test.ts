@@ -10,11 +10,14 @@ describe('Basic API', () => {
         expect(body).toEqual({ status: 'ok', env: 'test' });
     });
 
-    it('GET /api/layouts returns empty list', async () => {
+    it('GET /api/layouts returns authorized stub', async () => {
         const res = await app.request('/api/layouts');
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body).toHaveProperty('layouts');
+        
+        // In 'test' env, middleware should inject admin@local
+        expect(body).toHaveProperty('message', 'Hello admin@local');
+        expect(body).toHaveProperty('role', 'admin');
         expect(Array.isArray((body as any).layouts)).toBe(true);
     });
 });
