@@ -44,4 +44,42 @@ describe('Basic API', () => {
         const getBody = await getRes.json();
         expect((getBody as any).layout.name).toBe('New Layout');
     });
+
+    it('POST /api/layouts/:id/images uploads file', async () => {
+        // 1. Create Layout first
+        const createRes = await app.request('/api/layouts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'Layout for Images', scale: 'N' })
+        });
+        const layoutId = (await createRes.json() as any).layout.id;
+
+        // 2. Upload Image Stub
+        // Hono request mock for Multipart is tricky, we construct a Request object manually
+        const formData = new FormData();
+        const fileContent = new Blob(['fake-image-content'], { type: 'text/plain' });
+        formData.append('file', fileContent, 'test.txt'); // Using txt to verify non-image handling (or simple handling)
+        
+        // Note: Our backend assumes .pop() extension. 'test.txt' -> .txt.
+        
+        const req = new Request(`http://localhost/api/layouts/${layoutId}/images`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        // We need to inject 'user' context manually? 
+        // No, middleware does it if we don't pass headers (env=test).
+        const uploadRes = await app.fetch(req); 
+        expect(uploadRes.status).toBe(201);
+        
+        const uploadBody = await uploadRes.json();
+        const imageId = (uploadBody as any).image.id;
+        expect(imageId).toBeDefined();
+
+        // 3. Retrieve Image
+        const getRes = await app.request(`/api/images/${imageId}`);
+        expect(getRes.status).toBe(200);
+        const text = await getRes.text();
+        expect(text).toBe('fake-image-content');
+    });
 });
