@@ -19,17 +19,13 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', env: process.env.NODE_ENV || 'development' });
 });
 
+import layoutRoutes from './routes/layouts.js';
+
 // Protect API routes
 app.use('/api/*', authMiddleware);
 
-// Stub for layouts with user info
-app.get('/api/layouts', (c) => {
-  const user = c.var.user;
-  return c.json({ 
-      message: `Hello ${user.email}`,
-      role: user.role,
-      layouts: [] 
-  });
-});
+// Mount sub-apps
+app.route('/api/layouts', layoutRoutes);
+
 
 export default app;
