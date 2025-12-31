@@ -150,11 +150,17 @@ export class RrLabel extends LitElement {
   }
 
   willUpdate(changedProperties: Map<string, any>) {
-    // Synchronously clear state when image or file changes to prevent stale data usage
-    if (changedProperties.has('r49File') || changedProperties.has('imageIndex')) {
+    // Recalculate symbol size if layout or file changes
+    if (changedProperties.has('r49File') || changedProperties.has('imageIndex') || changedProperties.has('classifier')) {
       this.updateSymbolSize();
-      this.validationResults = {};
-      this._imageBitmap = null;
+      
+      // If the image index or classifier changed, clear validation results.
+      if (changedProperties.has('imageIndex') || changedProperties.has('classifier')) {
+        this.validationResults = {};
+        if (changedProperties.has('imageIndex')) {
+            this._imageBitmap = null;
+        }
+      }
       this._updateImage();
     }
   }
@@ -162,10 +168,11 @@ export class RrLabel extends LitElement {
   // When image loads or manifest changes, we might need to recalculate if resolution changed
   updated(changedProperties: Map<string, any>) {
     // Re-validate markers if the classifier, bitmap, or dragging state changes.
-    // By only validating when _imageBitmap is present, we ensure we don't use stale data.
+
     if (
         changedProperties.has('classifier') || 
         changedProperties.has('_imageBitmap') ||
+        changedProperties.has('r49File') || // Added to handle marker movements
         changedProperties.has('dragHandle')
     ) {
         if (this._imageBitmap && !this.dragHandle) {
@@ -204,11 +211,18 @@ export class RrLabel extends LitElement {
     const img_dpt = this.manifest.dots_per_track;
     if (img_dpt <= 0) return; 
 
-    // Use a local object to batch results and prevent multiple render cycles
-    const results: Record<string, ValidationResult> = {};
     const labels = Object.entries(currentImage.labels);
+    let resultsChanged = false;
+    const newResults = { ...this.validationResults };
 
+    // Identify which markers need (re)validation
     const tasks = labels.map(async ([id, marker]) => {
+        // Skip if we already have a valid result for this exact biomarker (type + pos)
+        const prev = this.validationResults[id];
+        if (prev && prev.x === marker.x && prev.y === marker.y && prev.type === marker.type) {
+            return;
+        }
+
         const requestId = (this._markerValidationRequests[id] || 0) + 1;
         this._markerValidationRequests[id] = requestId;
 
@@ -219,11 +233,11 @@ export class RrLabel extends LitElement {
                 img_dpt
             );
 
-            // Guard against stale results if image index changed during async work
+            // Guard against stale results
             if (this.imageIndex !== currentImageIndex || 
                 this._markerValidationRequests[id] !== requestId) return;
             
-            results[id] = { 
+            newResults[id] = { 
                x: marker.x, 
                y: marker.y, 
                type: marker.type, 
@@ -231,16 +245,28 @@ export class RrLabel extends LitElement {
                predicted: predictedLabel,
                comparison: undefined 
             };
+            resultsChanged = true;
         } catch (e) {
-            console.error(`[rr-label] Classification failed for ${id}`, e);
+            // We already added a silent catch in classifier.ts for detatched bitmaps,
+            // so we don't need to do much here except avoid crashing.
+            console.debug(`[rr-label] Classification skipped for ${id}:`, e);
         }
     });
 
     await Promise.all(tasks);
 
-    // One final check before setting state to trigger a single update cycle
-    if (this.imageIndex === currentImageIndex && !this.dragHandle) {
-        this.validationResults = results;
+    // If marker set changed (some markers deleted), prune them from results
+    const labelIds = new Set(labels.map(([id]) => id));
+    for (const id in newResults) {
+        if (!labelIds.has(id)) {
+            delete newResults[id];
+            resultsChanged = true;
+        }
+    }
+
+    // Only update state if something actually changed to avoid cycles
+    if (resultsChanged && this.imageIndex === currentImageIndex && !this.dragHandle) {
+        this.validationResults = newResults;
     }
   }
 
@@ -280,6 +306,7 @@ export class RrLabel extends LitElement {
   private markerTemplate(category: MarkerCategory) {
     if (!this.manifest.images[this.imageIndex]) return svg``;
     const markers = this.manifest.images[this.imageIndex].labels || {};
+    console.log(`[rr-label] Rendering ${Object.keys(markers).length} markers for image ${this.imageIndex}`, markers);
     return svg`
       ${Object.entries(markers).map(([markerId, marker]) => {
         const validation = this.validationResults[markerId];

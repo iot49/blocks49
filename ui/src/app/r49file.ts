@@ -2,6 +2,7 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { createContext } from '@lit/context';
 import { Manifest } from './manifest.ts';
+import { railsClient } from '../api/client.js';
 
 export const r49FileContext = createContext<R49File>('r49File');
 
@@ -163,20 +164,27 @@ export class R49File extends EventTarget {
         if (this._images.length === 0) return;
 
         const zip = new JSZip();
-        const imageFilenames: string[] = [];
-
-        this._images.forEach((img, i) => {
-            let extension = 'jpeg';
-            const parts = img.name.split('.');
-            if (parts.length > 1) extension = parts[parts.length - 1];
-            else if (img.blob.type) {
-                const typeParts = img.blob.type.split('/');
+        
+        // Parallel fetch blobs
+        const imageEntries = await Promise.all(this._images.map(async (img, i) => {
+             const blob = await img.ensureBlob();
+             
+             let extension = 'jpeg';
+             const parts = img.name.split('.');
+             if (parts.length > 1) extension = parts[parts.length - 1];
+             else if (blob.type) {
+                const typeParts = blob.type.split('/');
                 if (typeParts.length > 1) extension = typeParts[1];
-            }
-
-            const imageName = `image-${i}.${extension}`;
-            zip.file(imageName, img.blob);
-            imageFilenames.push(imageName);
+             }
+             
+             const imageName = `image-${i}.${extension}`;
+             return { name: imageName, blob };
+        }));
+        
+        const imageFilenames: string[] = [];
+        imageEntries.forEach(entry => {
+            zip.file(entry.name, entry.blob);
+            imageFilenames.push(entry.name);
         });
 
         const images = imageFilenames.map((filename, index) => {
@@ -196,6 +204,119 @@ export class R49File extends EventTarget {
         saveAs(content, filename);
     }
 
+    public async syncFromApi(layoutId: string) {
+        try {
+            const layout = await railsClient.getLayout(layoutId);
+
+            // Dispose old images
+            this._images.forEach(img => img.dispose());
+
+            // Create new images from URLs
+            this._images = layout.images.map(imgData => {
+                const url = railsClient.getImageUrl(imgData.id);
+                // We use the ID as name or original filename?
+                return new R49Image(url, imgData.filename || 'image.jpg');
+            });
+
+            // Update Manifest
+            this._detachManifestListener();
+            console.log("[R49File] syncFromApi raw layout:", JSON.stringify(layout, null, 2));
+            
+            // Map Layout Props
+            this._manifest.setLayout({
+                id: layout.id,
+                name: layout.name,
+                description: layout.description,
+                scale: layout.scale as any,
+                size: { width: layout.width, height: layout.height } // Load dimensions from API
+            });
+            
+            // Map Calibration
+            if (layout.calibration) {
+                // We iterate and set markers because Manifest uses internal reactivity
+                // Or just overwrite _data.calibration? 
+                // Manifest doesn't expose a bulk setter for calibration, but it exposes the getter.
+                // We should add a method or iterate key/values.
+                // The current manifest public API has setMarker.
+                // Or we can manipulate the private _manifest if we really want, but let's be clean.
+                // Manifest constructor accepts data, but we already created it.
+                // Let's iterate.
+                Object.entries(layout.calibration).forEach(([key, point]) => {
+                     this._manifest.setMarker('calibration', key, point.x, point.y);
+                });
+            }
+            
+            // Map Images Metadata
+            const newManifestImages = layout.images.map((img, idx) => {
+                console.log(`[R49File] syncFromApi Image ${idx} labels from API:`, JSON.stringify(img.labels));
+                return {
+                    filename: img.filename || 'image.jpg',
+                    labels: img.labels || {} 
+                };
+            });
+            this._manifest.setImages(newManifestImages);
+
+            this._attachManifestListener();
+            this._emitChange('load');
+            this._emitChange('manifest'); // Ensure UI updates name/scale
+            this._emitChange('images'); 
+            
+        } catch (e) {
+            console.error("Sync failed", e);
+            throw e;
+        }
+    }
+
+    /**
+     * Migrates the current client-side state (Manifest + Images) to the Backend.
+     * Creates a new Layout, sets dimensions, and uploads images.
+     * Then syncs the R49File with the new remote record.
+     */
+    public async migrateToBackend(): Promise<string> {
+        const layoutName = this._manifest.layout.name || 'Imported Layout';
+        const scale = this._manifest.layout.scale;
+        
+        try {
+            // 1. Create Layout
+            console.log("Migrating: Creating layout...");
+            const layout = await railsClient.createLayout(layoutName, scale);
+            
+            // 2. Update Details (Dimensions)
+            // Note: API field is width/height. Manifest is size.width/size.height
+            if (this._manifest.layout.size.width) {
+                 await railsClient.updateLayout(layout.id, {
+                     width: this._manifest.layout.size.width,
+                     height: this._manifest.layout.size.height,
+                     calibration: this._manifest.calibration,
+                 });
+            }
+
+            // 3. Upload Images
+            console.log(`Migrating: Uploading ${this._images.length} images...`);
+            for (let i = 0; i < this._images.length; i++) {
+                const img = this._images[i];
+                const labels = this._manifest.images[i]?.labels || {};
+                console.log(`[R49File] Image ${i} labels before upload:`, labels);
+                
+                const blob = await img.ensureBlob();
+                if (blob) {
+                    const filename = img.name || `image-${i}.jpg`;
+                    const file = new File([blob], filename, { type: blob.type });
+                    await railsClient.uploadImage(layout.id, file, labels);
+                }
+            }
+
+            // 4. Reload from API (Sync)
+            console.log("Migrating: Syncing...");
+            await this.syncFromApi(layout.id);
+            
+            return layout.id;
+        } catch (e) {
+            console.error("Migration failed", e);
+            throw e;
+        }
+    }
+
     /**
      * Adds an image file with validation.
      * 
@@ -209,13 +330,16 @@ export class R49File extends EventTarget {
             const objectURL = URL.createObjectURL(file);
             const img = new Image();
             
-            img.onload = () => {
+            img.onload = async () => {
                 // Validation: Only if we already have images
+                // Note: If we are syncing from API, we trust API images are consistent?
+                // But if user uploads a new one, we should validate against existing.
                 if (this._images.length > 0) {
                     const currentWidth = this._manifest.camera.resolution.width;
                     const currentHeight = this._manifest.camera.resolution.height;
                     
-                    if (img.width !== currentWidth || img.height !== currentHeight) {
+                    // If resolution is set, check match
+                    if (currentWidth && currentHeight && (img.width !== currentWidth || img.height !== currentHeight)) {
                         URL.revokeObjectURL(objectURL);
                         reject(new Error(
                             `New image dimensions (${img.width}x${img.height}) must match existing images (${currentWidth}x${currentHeight}).`
@@ -224,6 +348,33 @@ export class R49File extends EventTarget {
                     }
                 }
 
+                // Cloud Mode: Upload to API
+                if (this._manifest.layout.id) {
+                    try {
+                        const layoutId = this._manifest.layout.id;
+                        await railsClient.uploadImage(layoutId, file);
+                        
+                        // If this is the FIRST image, we might want to set layout dimensions on backend?
+                        if (this._images.length === 0) {
+                             await railsClient.updateLayout(layoutId, {
+                                 width: img.width,
+                                 height: img.height
+                             });
+                        }
+                        
+                        await this.syncFromApi(layoutId);
+                        
+                        URL.revokeObjectURL(objectURL);
+                        resolve();
+                        return;
+                    } catch (e) {
+                         URL.revokeObjectURL(objectURL);
+                         reject(e);
+                         return;
+                    }
+                }
+
+                // Legacy Local Mode:
                 // Update manifest dimensions (idempotent if already set)
                 this._manifest.setImageDimensions(img.width, img.height);
 
@@ -336,13 +487,18 @@ export class R49File extends EventTarget {
  * Resources must be manually released via `dispose()`.
  */
 class R49Image {
-    private _blob: Blob;
+    private _blob: Blob | null = null;
+    private _url: string | null = null;
     private _name: string;
     private _objectURL: string | null = null;
     private _bitmap: ImageBitmap | null = null;
 
-    constructor(blob: Blob, name: string) {
-        this._blob = blob;
+    constructor(source: Blob | string, name: string) {
+        if (source instanceof Blob) {
+            this._blob = source;
+        } else {
+            this._url = source;
+        }
         this._name = name;
     }
 
@@ -350,44 +506,50 @@ class R49Image {
 
     /**
      * The raw Blob data.
-     * Required by `R49File.save()` to serialize the image data into the ZIP file.
-     * Also useful if consumers need to upload the raw image.
+     * Returns null if initialized with URL and not yet fetched.
      */
-    get blob(): Blob { return this._blob; }
+    get blob(): Blob | null { return this._blob; }
     
+    /**
+     * Ensures blob is available (fetching if necessary).
+     */
+    async ensureBlob(): Promise<Blob> {
+        if (this._blob) return this._blob;
+        if (this._url) {
+            const res = await fetch(this._url);
+            if (!res.ok) throw new Error(`Failed to fetch image ${this._url}`);
+            this._blob = await res.blob();
+            return this._blob;
+        }
+        throw new Error("No source for image");
+    }
+
     get objectURL(): string {
-        if (!this._objectURL) {
+        if (this._url) return this._url;
+        
+        if (!this._objectURL && this._blob) {
             this._objectURL = URL.createObjectURL(this._blob);
         }
-        return this._objectURL;
+        return this._objectURL || '';
     }
 
     get bitmap(): Promise<ImageBitmap> {
-        if (!this._bitmap) {
-             return createImageBitmap(this._blob).then(bm => {
-                 this._bitmap = bm;
-                 return bm;
-             });
-        }
-        return Promise.resolve(this._bitmap);
+        if (this._bitmap) return Promise.resolve(this._bitmap);
+        
+        const sourcePromise = this.ensureBlob(); // Consistent way: fetch blob then make bitmap
+        // Alternatively, createImageBitmap(img) but we need to load img.
+        
+        return sourcePromise.then(blob => createImageBitmap(blob)).then(bm => {
+            this._bitmap = bm;
+            return bm;
+        });
     }
 
     /**
      * Cleans up valid browser resources.
-     * 
-     * WHY MANUAL DISPOSAL?
-     * 1. objectURL: Created via `URL.createObjectURL()`. This tells the browser to keep
-     *    a reference to the Blob in memory, accessible via the returned string.
-     *    CRITICAL: This reference exists until the document is unloaded or `revokeObjectURL`
-     *    is explicitly called. Even if the `<img>` tag in `rr-layout-editor` switches to
-     *    a new src, or the `R49Image` JS object is garbage collected, the BROWSER still
-     *    holds the Blob in memory because the string URL is theoretically still valid.
-     *    We must manually sever this link to free the memory.
-     * 2. bitmap: ImageBitmap objects hold GPU/heavy memory. Explicit closing is
-     *    recommended to prevent memory pressure in heavy applications.
      */
     dispose() {
-        if (this._objectURL) {
+        if (this._objectURL && this._blob) { // Only revoke if WE created it from Blob
             URL.revokeObjectURL(this._objectURL);
             this._objectURL = null;
         }

@@ -87,6 +87,21 @@ export class RrMain extends LitElement {
       this._viewMode = this._viewMode === 'editor' ? 'live' : 'editor';
   };
 
+  /**
+   * Loads the selected layout from the API.
+   */
+  private _handleLayoutSelected = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const layoutId = detail.layoutId;
+      console.log(`Loading layout: ${layoutId}`);
+      if (layoutId) {
+          this._r49File.syncFromApi(layoutId).catch(err => {
+              console.error("Failed to sync layout:", err);
+              alert("Failed to load layout. See console.");
+          });
+      }
+  }
+
   static styles = css`
     :host {
       display: flex;
@@ -100,12 +115,14 @@ export class RrMain extends LitElement {
     super.connectedCallback();
     this.addEventListener('rr-view-toggle', this._handleViewToggle as EventListener);
     this.addEventListener('rr-classifier-settings-change', this._handleClassifierSettingsChange as EventListener);
+    this.addEventListener('layout-selected', this._handleLayoutSelected as EventListener);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this.removeEventListener('rr-view-toggle', this._handleViewToggle as EventListener);
     this.removeEventListener('rr-classifier-settings-change', this._handleClassifierSettingsChange as EventListener);
+    this.removeEventListener('layout-selected', this._handleLayoutSelected as EventListener);
   }
 
   render() {

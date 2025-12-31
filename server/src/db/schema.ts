@@ -26,6 +26,10 @@ export const layouts = sqliteTable('layouts', {
   // Scale (Enum: 'N', 'HO', 'Z', ...).
   scale: text('scale').default('HO'),
   
+  width: real('width'),
+  height: real('height'),
+  calibration: text('calibration', { mode: 'json' }), // Stores Record<string, Point>
+  
   updatedAt: integer('updated_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
@@ -37,5 +41,6 @@ export const images = sqliteTable('images', {
     filename: text('filename'),
     width: integer('width'),
     height: integer('height'),
+    labels: text('labels', { mode: 'json' }), // Stores Record<string, Point & { type: string }>
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });

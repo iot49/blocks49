@@ -256,6 +256,7 @@ export interface ManifestData {
 }
 
 export interface Layout {
+  id?: string; // UUID from backend
   name: string | undefined;
   scale: ValidScales;
   size: { width: number | undefined; height: number | undefined };  // in mm

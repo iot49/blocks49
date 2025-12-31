@@ -17,7 +17,8 @@ type Env = {
 const app = new Hono<Env>();
 
 // Local Storage Path (Docker Volume)
-const STORAGE_DIR = process.env.STORAGE_DIR || './data/images';
+const serverRoot = new URL('../../', import.meta.url).pathname;
+const STORAGE_DIR = process.env.STORAGE_DIR || join(serverRoot, 'data/images');
 
 // Helper: Ensure storage dir exists
 async function ensureDir() {
@@ -40,9 +41,20 @@ app.post('/:layoutId/images', async (c) => {
     // 2. Parse Body (Multipart)
     const body = await c.req.parseBody();
     const file = body['file'];
+    const labelsRaw = body['labels'];
 
     if (!file || !(file instanceof File)) {
         return c.json({ error: 'No file uploaded' }, 400);
+    }
+
+    let labelsJson = null;
+    if (labelsRaw && typeof labelsRaw === 'string') {
+        try {
+            labelsJson = JSON.parse(labelsRaw);
+            console.log(`[Backend] Parsed labels for layout ${layoutId}:`, JSON.stringify(labelsJson));
+        } catch (e) {
+            console.warn("[Backend] Failed to parse labels during upload", e);
+        }
     }
 
     // 3. Save File Locally
@@ -62,8 +74,10 @@ app.post('/:layoutId/images', async (c) => {
         filename: file.name,
         width: 0, // Placeholder, real app would read metadata
         height: 0,
+        labels: labelsJson,
         createdAt: new Date()
     };
+    console.log(`[Backend] Saving image ${imageId} to DB with labels.`);
     await db.insert(images).values(newImage);
 
     return c.json({ image: newImage }, 201);

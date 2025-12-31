@@ -100,7 +100,7 @@ export class RrLayoutEditor extends LitElement {
   private _fileToolsTemplate() {
     return html`
       <div class="toolbar-group">
-        ${this._renderToolButton('Upload Image', 'folder2-open', 'open', false)},
+        ${this._renderToolButton('Open Project or Upload Image', 'folder2-open', 'open', false)},
         ${this._renderToolButton('Save Image', 'floppy', 'save', this.currentImageIndex < 0)}
       </div>
     `;
@@ -178,7 +178,7 @@ export class RrLayoutEditor extends LitElement {
         this.activeTool = null;
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.r49,application/zip,.zip';
+        input.accept = '.r49,application/zip,.zip,image/jpeg,image/png,image/jpg';
         input.onchange = this._handleChooseFile.bind(this);
         input.click();
         break;
@@ -206,8 +206,21 @@ export class RrLayoutEditor extends LitElement {
     try {
       await this.r49File.load(file);
       this.currentImageIndex = 0;
+
+      // Auto-Migrate to Backend
+      // This converts the legacy local Zip file into a cloud Layout + Images
+      const layoutId = await this.r49File.migrateToBackend();
+
+      // Notify App to switch context to the new API-based layout
+      this.dispatchEvent(new CustomEvent('layout-selected', { 
+          detail: { layoutId: layoutId },
+          bubbles: true, 
+          composed: true 
+      }));
+
+      // alert("Import successful!"); // Optional
     } catch (e) {
-      alert(`Error loading file: ${(e as Error).message}`);
+      alert(`Error loading/migrating file: ${(e as Error).message}`);
       console.error(e);
     }
   }

@@ -3,6 +3,7 @@ import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import { Manifest, Scale2Number } from './app/manifest.ts';
 import { R49File, r49FileContext } from './app/r49file.ts';
+import { railsClient } from './api/client.js';
 import { 
   HEIGHT_COLOR, 
   WIDTH_COLOR, 
@@ -74,6 +75,13 @@ export class RrSettings extends LitElement {
   @state()
   private _selectedPrecision: string = DEFAULT_PRECISION;
 
+  // TODO: make unique name, e.g. Layout-1, Layout-2, etc.
+  @state()
+  private _newLayoutName: string = 'Layout';
+
+  @state()
+  private _newLayoutScale: string = 'HO';
+
   get manifest(): Manifest {
     return this.r49File?.manifest;
   }
@@ -130,6 +138,7 @@ export class RrSettings extends LitElement {
       <sl-tab-group>
         <sl-tab slot="nav" panel="layout">Layout</sl-tab>
         <sl-tab slot="nav" panel="classifier">Classifier</sl-tab>
+        <sl-tab slot="nav" panel="project">Projects</sl-tab>
 
         <sl-tab-panel name="layout">
           ${this._renderLayoutSettings()}
@@ -137,6 +146,10 @@ export class RrSettings extends LitElement {
 
         <sl-tab-panel name="classifier">
           ${this._renderClassifierSettings()}
+        </sl-tab-panel>
+
+        <sl-tab-panel name="project">
+          ${this._renderProjectSettings()}
         </sl-tab-panel>
       </sl-tab-group>
     `;
@@ -217,6 +230,49 @@ export class RrSettings extends LitElement {
           </sl-radio-group>
       </div>
     `;
+  }
+
+  private _renderProjectSettings() {
+      return html`
+        <div style="padding: 1rem; display: flex; flex-direction: column; gap: 1rem;">
+            <h3>Create New Layout</h3>
+            <sl-input 
+                label="Layout Name" 
+                value=${this._newLayoutName} 
+                @sl-input=${(e: any) => this._newLayoutName = e.target.value}
+            ></sl-input>
+            
+             <sl-select 
+                label="Scale" 
+                value=${this._newLayoutScale}
+                @sl-change=${(e: any) => this._newLayoutScale = e.target.value}
+            >
+                ${Object.keys(Scale2Number).map(s => html`<sl-option value=${s}>${s}</sl-option>`)}
+            </sl-select>
+
+            <sl-button variant="primary" @click=${this._handleCreateLayout}>Create Layout</sl-button>
+        </div>
+      `;
+  }
+
+  private async _handleCreateLayout() {
+    console.log("Creating layout", this._newLayoutName, this._newLayoutScale);
+      if (!this._newLayoutName) return alert("Name required");
+      try {
+          const layout = await railsClient.createLayout(this._newLayoutName, this._newLayoutScale);
+          // Dispatch selection
+          this.dispatchEvent(new CustomEvent('layout-selected', { 
+              detail: { layoutId: layout.id },
+              bubbles: true, 
+              composed: true 
+          }));
+          // Reset
+          this._newLayoutName = '';          
+          alert("Layout created! Please close settings.");
+      } catch (e) {
+          alert("Failed to create layout");
+          console.error(e);
+      }
   }
 
   private _handleModelChange(e: CustomEvent) {

@@ -45,7 +45,7 @@ describe('Basic API', () => {
         expect((getBody as any).layout.name).toBe('New Layout');
     });
 
-    it('POST /api/layouts/:id/images uploads file', async () => {
+    it('POST /api/layouts/:id/images uploads file with labels', async () => {
         // 1. Create Layout first
         const createRes = await app.request('/api/layouts', {
             method: 'POST',
@@ -54,21 +54,19 @@ describe('Basic API', () => {
         });
         const layoutId = (await createRes.json() as any).layout.id;
 
-        // 2. Upload Image Stub
-        // Hono request mock for Multipart is tricky, we construct a Request object manually
+        // 2. Upload Image with Labels
         const formData = new FormData();
         const fileContent = new Blob(['fake-image-content'], { type: 'text/plain' });
-        formData.append('file', fileContent, 'test.txt'); // Using txt to verify non-image handling (or simple handling)
+        const labels = { "marker-1": { x: 10, y: 20, type: "train" } };
         
-        // Note: Our backend assumes .pop() extension. 'test.txt' -> .txt.
+        formData.append('file', fileContent, 'test.txt');
+        formData.append('labels', JSON.stringify(labels));
         
         const req = new Request(`http://localhost/api/layouts/${layoutId}/images`, {
             method: 'POST',
             body: formData,
         });
 
-        // We need to inject 'user' context manually? 
-        // No, middleware does it if we don't pass headers (env=test).
         const uploadRes = await app.fetch(req); 
         expect(uploadRes.status).toBe(201);
         
@@ -76,7 +74,14 @@ describe('Basic API', () => {
         const imageId = (uploadBody as any).image.id;
         expect(imageId).toBeDefined();
 
-        // 3. Retrieve Image
+        // 3. Retrieve Layout and Verify Labels
+        const getLayoutRes = await app.request(`/api/layouts/${layoutId}`);
+        const getLayoutBody = await getLayoutRes.json();
+        const apiImage = (getLayoutBody as any).layout.images.find((img: any) => img.id === imageId);
+        expect(apiImage).toBeDefined();
+        expect(apiImage.labels).toEqual(labels);
+
+        // 4. Retrieve Raw Image Content
         const getRes = await app.request(`/api/images/${imageId}`);
         expect(getRes.status).toBe(200);
         const text = await getRes.text();

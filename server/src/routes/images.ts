@@ -14,7 +14,8 @@ type Env = {
 };
 
 const app = new Hono<Env>();
-const STORAGE_DIR = process.env.STORAGE_DIR || './data/images';
+const serverRoot = new URL('../../', import.meta.url).pathname;
+const STORAGE_DIR = process.env.STORAGE_DIR || join(serverRoot, 'data/images');
 
 // GET /api/images/:id
 app.get('/:id', async (c) => {

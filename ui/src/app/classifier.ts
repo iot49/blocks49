@@ -204,6 +204,12 @@ export class Classifier {
     try {
         ctx.drawImage(image, sx, sy, srcSize, srcSize, 0, 0, dstSize, dstSize);
     } catch (e) {
+        // Silently handle "detached" image sources (happens if ImageBitmap is closed 
+        // while a request is pending in the queue).
+        if (e instanceof Error && (e.name === 'InvalidStateError' || e.message.includes('detached'))) {
+            console.debug("[Classifier] Skipping patch: Image source detached");
+            return null;
+        }
         console.error("[Classifier] Failed to draw image patch", e);
         return null;
     }

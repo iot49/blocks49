@@ -5,7 +5,7 @@ import { eq, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
 import { getDb } from '../db/index.js';
-import { layouts } from '../db/schema.js';
+import { layouts, images } from '../db/schema.js';
 import type { AuthUser } from '../middleware/auth.js';
 
 // Extend Hono environment to include AuthUser
@@ -30,13 +30,13 @@ app.get('/', async (c) => {
   const db = getDb();
 
   // Admin sees all, User sees own
-  const query = db
+  let query = db
     .select()
     .from(layouts)
     .orderBy(desc(layouts.updatedAt));
 
   if (user.role !== 'admin') {
-    query.where(eq(layouts.userId, user.email)); // Using email as ID for now since auth middleware uses it. 
+    query = query.where(eq(layouts.userId, user.email)) as any; // Using email as ID for now since auth middleware uses it. 
     // TODO: In real app, we'd lookup User ID from email first or store UUID in JWT.
     // For this mock phase, we'll assume user.email matches the inserted userId or we align them.
     // Actually, in schema users.id is UUID. Let's fix this in follow-up to look up user.
@@ -86,16 +86,23 @@ app.get('/:id', async (c) => {
     const user = c.var.user;
     const db = getDb();
     
+    // 1. Get Layout
     const layout = await db.select().from(layouts).where(eq(layouts.id, id)).get();
-    
     if (!layout) return c.json({ error: 'Not found' }, 404);
 
-    // Verify Ownership
+    // 2. Verify Ownership
     if (user.role !== 'admin' && layout.userId !== user.email) {
         return c.json({ error: 'Unauthorized' }, 403);
     }
     
-    return c.json({ layout });
+    // 3. Get Images
+    const layoutImages = await db.select().from(images).where(eq(images.layoutId, id)).all();
+    console.log(`[Backend] GET layout ${id} returned ${layoutImages.length} images.`);
+    layoutImages.forEach((img, idx) => {
+        console.log(`[Backend] Image ${idx} (${img.id}) labels:`, JSON.stringify((img as any).labels));
+    });
+
+    return c.json({ layout: { ...layout, images: layoutImages } });
 });
 
 // Schema for Partial Updates
@@ -108,6 +115,9 @@ const patchLayoutSchema = z.object({
     calibrationX2: z.number().optional(),
     calibrationY2: z.number().optional(),
     referenceDistanceMm: z.number().optional(),
+    width: z.number().optional(),
+    height: z.number().optional(),
+    calibration: z.record(z.string(), z.any()).optional(), // Flexible JSON object
 });
 
 // PATCH /api/layouts/:id - Update

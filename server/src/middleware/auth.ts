@@ -16,6 +16,7 @@ type Env = {
 
 export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   const env = process.env.NODE_ENV || 'development';
+  console.log(`[Auth] Env: ${env}, Path: ${c.req.path}`);
 
   // 1. Local / Offline Mode
   // If explicitly in 'local' mode (Docker/Dev), bypass auth and act as Admin
