@@ -35,32 +35,28 @@ app.get('/:id', async (c) => {
     }
 
     // 3. Serve File
-    // In local FS, filenames were UUID.ext. We need to store that or infer.
-    // In upload, we saved as `imageId.extension`.
-    // Wait, DB stores original filename `image.filename` (e.g. `train.jpg`).
-    // We didn't store the storage key in DB in the schema I wrote earlier?
-    // Checking schema... "filename".
-    // Upload logic: `const filename = ${imageId}.${extension}` -> `filePath`.
-    // We should probably rely on ID + simple extension logic.
-    // Let's assume .jpg or read directory? 
-    // Correction: In Upload I inferred extension from original filename.
-    // I should strictly store the extension or the storage path in DB.
-    // Or just try to find the file.
+    const ext = image.filename?.split('.').pop()?.toLowerCase() || 'jpg';
+    const storageKey = `${image.id}.${ext}`; 
+    // Wait, Upload route saved as `imageId.extension` where extension came from filename.
     
-    // Simplification for MVP: Try finding file with ID.
-    // Or just update Upload to assume .jpg always if we control it? No, users upload png etc.
-    // Let's rely on finding standard extension or update schema to store storageKey.
-    // I'll update the logic to check extensions or just save storageKey.
-    // For now: assume same extension as original filename.
-    const ext = image.filename?.split('.').pop() || 'jpg';
-    const storageKey = `${image.id}.${ext}`;
+    const mimeMap: Record<string, string> = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'webp': 'image/webp'
+    };
+    const contentType = mimeMap[ext] || 'application/octet-stream';
     
     try {
         const buffer = await readFile(join(STORAGE_DIR, storageKey));
         return c.body(buffer, 200, {
-            'Content-Type': 'image/jpeg', // Dynamic based on ext ideally
+            'Content-Type': contentType,
+            'Cache-Control': 'private, max-age=86400' // Cache for 1 day
         });
-    } catch (e) {
+    } catch (e: any) {
+        if (e.code === 'ENOENT') {
+            return c.json({ error: 'File not found on disk' }, 404);
+        }
         return c.json({ error: 'File read error' }, 500);
     }
 });

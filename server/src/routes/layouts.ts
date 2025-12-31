@@ -83,13 +83,62 @@ app.post('/', zValidator('json', layoutSchema), async (c) => {
 // GET /api/layouts/:id - Get Single
 app.get('/:id', async (c) => {
     const id = c.req.param('id');
+    const user = c.var.user;
     const db = getDb();
     
     const layout = await db.select().from(layouts).where(eq(layouts.id, id)).get();
     
     if (!layout) return c.json({ error: 'Not found' }, 404);
+
+    // Verify Ownership
+    if (user.role !== 'admin' && layout.userId !== user.email) {
+        return c.json({ error: 'Unauthorized' }, 403);
+    }
     
     return c.json({ layout });
+});
+
+// Schema for Partial Updates
+const patchLayoutSchema = z.object({
+    name: z.string().min(1).optional(),
+    description: z.string().optional(),
+    scale: z.enum(['N', 'HO', 'Z', 'O', 'G']).optional(),
+    calibrationX1: z.number().optional(),
+    calibrationY1: z.number().optional(),
+    calibrationX2: z.number().optional(),
+    calibrationY2: z.number().optional(),
+    referenceDistanceMm: z.number().optional(),
+});
+
+// PATCH /api/layouts/:id - Update
+app.patch('/:id', zValidator('json', patchLayoutSchema), async (c) => {
+    const id = c.req.param('id');
+    const user = c.var.user;
+    const body = c.req.valid('json');
+    const db = getDb();
+
+    // 1. Verify Existence & Ownership
+    const layout = await db.select().from(layouts).where(eq(layouts.id, id)).get();
+    if (!layout) return c.json({ error: 'Not found' }, 404);
+    if (user.role !== 'admin' && layout.userId !== user.email) {
+        return c.json({ error: 'Unauthorized' }, 403);
+    }
+
+    // 2. Perform Update
+    // Filter out undefined keys from body to avoid overwriting with null/default if logic differed
+    // Drizzle's `set` handles partial objects well.
+    const updateData = {
+        ...body,
+        updatedAt: new Date(),
+    };
+
+    const updated = await db.update(layouts)
+        .set(updateData)
+        .where(eq(layouts.id, id))
+        .returning()
+        .get();
+
+    return c.json({ layout: updated });
 });
 
 export default app;
