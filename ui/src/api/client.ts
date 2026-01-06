@@ -44,27 +44,25 @@ export class LayoutClient {
 
     async listLayouts(): Promise<ApiLayout[]> {
         const res = await fetch(`${API_BASE}/layouts`);
-        if (!res.ok) throw new Error('Failed to fetch layouts');
+        if (!res.ok) throw new Error(`Failed to fetch layouts: ${res.statusText} (${res.status})`);
         const data = await res.json();
         return data.layouts;
     }
 
     async getLayout(id: string): Promise<ApiLayout> {
         const res = await fetch(`${API_BASE}/layouts/${id}`);
-        if (!res.ok) throw new Error('Failed to fetch layout');
+        if (!res.ok) throw new Error(`Failed to fetch layout: ${res.statusText} (${res.status})`);
         const data = await res.json();
         return data.layout;
     }
 
     async createLayout(name: string, scale: string): Promise<ApiLayout> {
-        console.log("Creating layout", name, scale, `${API_BASE}/layouts`);
         const res = await fetch(`${API_BASE}/layouts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, scale })
         });
-        // TODO: more descriptive error message (also for other Errors in app)
-        if (!res.ok) throw new Error('Failed to create layout');
+        if (!res.ok) throw new Error(`Failed to create layout: ${res.statusText} (${res.status})`);
         const data = await res.json();
 
         return data.layout;
@@ -76,13 +74,19 @@ export class LayoutClient {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
         });
-        if (!res.ok) throw new Error('Failed to update layout');
+        if (!res.ok) throw new Error(`Failed to update layout: ${res.statusText} (${res.status})`);
         const data = await res.json();
         return data.layout;
     }
 
+    async deleteLayout(id: string): Promise<void> {
+        const res = await fetch(`${API_BASE}/layouts/${id}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) throw new Error(`Failed to delete layout: ${res.statusText} (${res.status})`);
+    }
+
     async uploadImage(layoutId: string, file: File, labels?: Record<string, any>): Promise<ApiImage> {
-        console.log(`[RailsClient] uploadImage labels:`, labels);
         const formData = new FormData();
         formData.append('file', file);
         if (labels) {
@@ -94,7 +98,7 @@ export class LayoutClient {
             body: formData
         });
 
-        if (!res.ok) throw new Error('Failed to upload image');
+        if (!res.ok) throw new Error(`Failed to upload image: ${res.statusText} (${res.status})`);
         const data = await res.json();
         return data.image;
     }
@@ -105,7 +109,7 @@ export class LayoutClient {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
         });
-        if (!res.ok) throw new Error('Failed to update image');
+        if (!res.ok) throw new Error(`Failed to update image: ${res.statusText} (${res.status})`);
         const data = await res.json();
         return data.image;
     }

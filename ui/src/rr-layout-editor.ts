@@ -68,40 +68,32 @@ export class RrLayoutEditor extends LitElement {
   connectedCallback() {
       super.connectedCallback();
       this.addEventListener('layout-selected', this._onLayoutSelected);
-      
-      // Listen for data changes in the consumed layout instance
-      if (this.layout) {
-          this.layout.addEventListener('rr-layout-changed', this._handleLayoutDataChanged);
-      }
-      
       this._fetchLayouts();
   }
 
   disconnectedCallback() {
       super.disconnectedCallback();
       this.removeEventListener('layout-selected', this._onLayoutSelected);
-      
-      if (this.layout) {
-          this.layout.removeEventListener('rr-layout-changed', this._handleLayoutDataChanged);
-      }
   }
 
-  private _handleLayoutDataChanged = (e: Event) => {
-      const newData = (e as CustomEvent).detail;
-      const oldData = this.layout.layout;
+  willUpdate(changedProperties: Map<string | number | symbol, unknown>) {
+      if (changedProperties.has('layout')) {
+          const oldLayout = changedProperties.get('layout') as Layout | undefined;
+          const newLayout = this.layout;
 
-      // Only reset the index if the layout ID changed (new project loaded)
-      // or if the number of images changed (image added/deleted).
-      // Marker movements should NOT reset the index.
-      const layoutIdChanged = newData.id !== oldData.id;
-      const imagesCountChanged = newData.images.length !== oldData.images.length;
+          // Only reset the index if the layout ID changed (new project loaded)
+          // or if the number of images changed.
+          // Note: RrMain replaces the instance on EVERY change to propagate state,
+          // so we must compare the underlying IDs or image lengths.
+          const layoutIdChanged = newLayout?.id !== oldLayout?.id;
+          const imagesCountChanged = newLayout?.images?.length !== (oldLayout?.images?.length || 0);
 
-      if (layoutIdChanged || imagesCountChanged) {
-          console.log("[RrLayoutEditor] Layout or images changed, resetting thumbnail index");
-          if (this.images.length > 0) {
-              this.currentImageIndex = 0;
-          } else {
-              this.currentImageIndex = -1;
+          if (layoutIdChanged || imagesCountChanged) {
+              if (this.images.length > 0) {
+                  this.currentImageIndex = 0;
+              } else {
+                  this.currentImageIndex = -1;
+              }
           }
       }
   }
@@ -120,14 +112,10 @@ export class RrLayoutEditor extends LitElement {
       }
   }
 
-  private _handleLayoutChange(e: CustomEvent) {
-      const select = e.target as any;
-      const layoutId = select.value;
-      this.dispatchEvent(new CustomEvent('layout-selected', { 
-          detail: { layoutId },
-          bubbles: true, 
-          composed: true 
-      }));
+  private _handleLayoutMenuSelect(e: CustomEvent) {
+      const item = e.detail.item;
+      const layoutId = item.value;
+      this._selectLayout(layoutId);
   }
 
 
@@ -140,7 +128,6 @@ export class RrLayoutEditor extends LitElement {
       // a. Is there a layout named "demo"?
       const demoLayout = this._layouts.find(l => l.name === 'demo');
       if (demoLayout) {
-          console.log(`[Startup] Found demo layout: ${demoLayout.id}`);
           this._selectLayout(demoLayout.id);
           return;
       }
@@ -195,19 +182,20 @@ export class RrLayoutEditor extends LitElement {
 
     const statusTemplate = html`
       <div slot="status" class="status-bar">
-          <sl-select 
-              hoist 
-              value=${this.layout.id} 
-              @sl-change=${this._handleLayoutChange}
-              style="width: 200px; --sl-input-border-width: 0; --sl-input-background-color: transparent; --sl-input-color: white; font-weight: bold; font-size: var(--sl-font-size-medium);"
-          >
-              ${allLayouts.map(l => html`
-                  <sl-option value=${l.id}>${l.name}</sl-option>
-              `)}
-          </sl-select>
+          <sl-dropdown>
+              <span slot="trigger" class="layout-name">
+                  ${this.layout.name}
+                  <sl-icon name="caret-down-fill" style="font-size: 0.8em; margin-top: 2px;"></sl-icon>
+              </span>
+              <sl-menu @sl-select=${this._handleLayoutMenuSelect}>
+                  ${allLayouts.map(l => html`
+                      <sl-menu-item type="checkbox" value=${l.id} ?checked=${l.id === this.layout.id}>${l.name}</sl-menu-item>
+                  `)}
+              </sl-menu>
+          </sl-dropdown>
           <span>Scale: ${layout.scale}</span>
-          <span>Ref Dist: ${layout.referenceDistanceMm ? layout.referenceDistanceMm.toFixed(0) : '?'} mm</span>
-          <span>Resolution: ${dpt > 0 ? dpt.toFixed(2) + ' dpt' : 'Not Calibrated'}</span>
+          <!-- <span>Ref Dist: ${layout.referenceDistanceMm ? layout.referenceDistanceMm.toFixed(0) : '?'} mm</span> -->
+          <span>Resolution: ${dpt > 0 ? Math.round(dpt) + ' dpt' : 'Not Calibrated'}</span>
       </div>
     `;
 

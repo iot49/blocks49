@@ -76,7 +76,9 @@ export class RrSettings extends LitElement {
   @state()
   private _selectedPrecision: string = DEFAULT_PRECISION;
 
-  // TODO: make unique name, e.g. Layout-1, Layout-2, etc.
+  @state()
+  private _layouts: any[] = [];
+
   @state()
   private _newLayoutName: string = 'Layout';
 
@@ -93,6 +95,25 @@ export class RrSettings extends LitElement {
   connectedCallback() {
       super.connectedCallback();
       this._parseUrlParams();
+      this._fetchLayouts();
+  }
+
+  private async _fetchLayouts() {
+      try {
+          this._layouts = await layoutClient.listLayouts();
+          this._newLayoutName = this._generateUniqueName();
+      } catch (e) {
+          console.error("Failed to list layouts", e);
+      }
+  }
+
+  private _generateUniqueName(): string {
+      const names = new Set(this._layouts.map(l => l.name));
+      let i = 1;
+      while (names.has(`Layout-${i}`)) {
+          i++;
+      }
+      return `Layout-${i}`;
   }
 
   private _parseUrlParams() {
@@ -160,7 +181,6 @@ export class RrSettings extends LitElement {
   }
 
   private _renderLayoutSettings() {
-    // TODO: replace width/heightwith referenceDistanceMm
     return html`
       <div class="settings-table">
         <div class="settings-row">
@@ -174,7 +194,7 @@ export class RrSettings extends LitElement {
           </div>
         </div>
         <div class="settings-row">
-          <div class="settings-label" style="color: ${REF_LINE_COLOR}">Reference Dist (mm):</div>
+          <div class="settings-label">Ref Dist [mm]:</div>
           <div class="settings-field">
             <sl-input
               type="number"
@@ -196,7 +216,7 @@ export class RrSettings extends LitElement {
               <sl-menu @sl-select=${this._handleScaleSelect}>
                 ${Object.keys(Scale2Number).map(
                   (scale) =>
-                    html`<sl-menu-item value=${scale}
+                    html`<sl-menu-item type="checkbox" value=${scale} ?checked=${scale === this.layoutScale}
                       >${scale} (1:${Scale2Number[scale as keyof typeof Scale2Number]})</sl-menu-item
                     >`,
                 )}
@@ -233,43 +253,94 @@ export class RrSettings extends LitElement {
   private _renderProjectSettings() {
       return html`
         <div style="padding: 1rem; display: flex; flex-direction: column; gap: 1rem;">
-            <h3>Create New Layout</h3>
-            <sl-input 
-                label="Layout Name" 
-                value=${this._newLayoutName} 
-                @sl-input=${(e: any) => this._newLayoutName = e.target.value}
-            ></sl-input>
-            
-             <sl-select 
-                label="Scale" 
-                value=${this._newLayoutScale}
-                @sl-change=${(e: any) => this._newLayoutScale = e.target.value}
-            >
-                ${Object.keys(Scale2Number).map(s => html`<sl-option value=${s}>${s}</sl-option>`)}
-            </sl-select>
+            <div>
+                <h3>Create New Layout</h3>
+                <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 300px;">
+                    <sl-input 
+                        label="Layout Name" 
+                        value=${this._newLayoutName} 
+                        @sl-input=${(e: any) => this._newLayoutName = e.target.value}
+                    ></sl-input>
+                    
+                    <sl-select 
+                        label="Scale" 
+                        value=${this._newLayoutScale}
+                        @sl-change=${(e: any) => this._newLayoutScale = e.target.value}
+                    >
+                        ${Object.keys(Scale2Number).map(s => html`<sl-option value=${s}>${s}</sl-option>`)}
+                    </sl-select>
 
-            <sl-button variant="primary" @click=${this._handleCreateLayout}>Create Layout</sl-button>
+                    <sl-button variant="primary" @click=${this._handleCreateLayout}>Create Layout</sl-button>
+                </div>
+            </div>
+
+            <sl-divider></sl-divider>
+
+            <div>
+                <h3>Manage Layouts</h3>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    ${this._layouts.map(l => html`
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; border: 1px solid var(--sl-color-neutral-200); border-radius: var(--sl-border-radius-medium);">
+                            <span>${l.name} (${l.scale})</span>
+                            <sl-icon-button 
+                                name="trash" 
+                                label="Delete Layout"
+                                style="font-size: 1.2rem; color: var(--sl-color-danger-600);"
+                                @click=${() => this._handleDeleteLayout(l.id)}
+                            ></sl-icon-button>
+                        </div>
+                    `)}
+                    ${this._layouts.length === 0 ? html`<p style="color: var(--sl-color-neutral-500);">No layouts found.</p>` : ''}
+                </div>
+            </div>
         </div>
       `;
   }
 
   // TODO: backup & restore layouts
 
-  // TODO: replace with NewLayoutTool in rr-layout-editor. 
-  // TODO: a way to delete layouts
+  private async _handleDeleteLayout(id: string) {
+      if (!confirm("Are you sure you want to delete this layout? This cannot be undone.")) return;
+      
+      try {
+          await layoutClient.deleteLayout(id);
+          await this._fetchLayouts();
+          
+          // If the deleted layout was the current one, we might want to switch or alert.
+          // For now, let's just refresh the list.
+          if (id === this.layout.id) {
+              alert("Current layout deleted. Selecting another layout...");
+              if (this._layouts.length > 0) {
+                   this.dispatchEvent(new CustomEvent('layout-selected', { 
+                      detail: { layoutId: this._layouts[0].id },
+                      bubbles: true, 
+                      composed: true 
+                  }));
+              } else {
+                  // Fallback: reload page or notify
+                  window.location.reload();
+              }
+          }
+      } catch (e) {
+          alert("Failed to delete layout");
+          console.error(e);
+      }
+  }
+
   private async _handleCreateLayout() {
     console.log("Creating layout", this._newLayoutName, this._newLayoutScale);
       if (!this._newLayoutName) return alert("Name required");
       try {
           const layout = await layoutClient.createLayout(this._newLayoutName, this._newLayoutScale);
+          // Refresh list and name
+          await this._fetchLayouts();
+          
           // Dispatch selection
           this.dispatchEvent(new CustomEvent('layout-selected', { 
               detail: { layoutId: layout.id },
               bubbles: true, 
               composed: true 
           }));
-          // Reset
-          this._newLayoutName = '';          
           alert("Layout created! Please close settings.");
       } catch (e) {
           alert("Failed to create layout");

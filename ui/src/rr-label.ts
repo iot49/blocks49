@@ -11,12 +11,8 @@ import { Classifier, classifierContext } from './app/classifier.ts';
 import { type ApiMarker } from './api/client.js';
 import { type Layout, layoutContext } from './api/layout.ts';
 
-/*
-TODO: investegate feasibility of proposed solution.
-BUG: marker position is not updated during drag, only on mouseup.
-SOLUTION: update immediately on mousemove, but delay database update.
-Changes to Layout (re)start a commitTimer (config.ts: DB_COMMIT_TIMEOUT_MS). The database updates only when the timer expires.
-*/
+// Real-time marker updates with debounced commit (DB_COMMIT_TIMEOUT_MS) 
+// ensure visual feedback is immediate while minimizing backend traffic.
 
 
 interface ValidationResult {
@@ -338,7 +334,6 @@ export class RrLabel extends LitElement {
       ${Object.entries(markers).map(([markerId, m]) => {
         const marker = m as ApiMarker; 
         const validation = this.validationResults[markerId];
-        // TODO: stroke width independent of container size
         const color = validation
           ? validation.match 
             ? (validation.comparison && !validation.comparison.match ? 'orange' : 'green') 
@@ -363,6 +358,8 @@ export class RrLabel extends LitElement {
                 class="validation-rect"
                 stroke=${color}
                 stroke-dasharray=${strokeDasharray}
+                stroke-width="2"
+                vector-effect="non-scaling-stroke"
             />
           </g>
         `;

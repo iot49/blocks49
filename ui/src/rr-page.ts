@@ -1,5 +1,5 @@
 import { LitElement, html, css } from 'lit';
-import { customElement } from 'lit/decorators.js';
+import { customElement, state } from 'lit/decorators.js';
 import '@shoelace-style/shoelace/dist/components/dialog/dialog.js';
 import '@shoelace-style/shoelace/dist/components/select/select.js';
 import '@shoelace-style/shoelace/dist/components/option/option.js';
@@ -82,14 +82,14 @@ export class RrPage extends LitElement {
   // No longer managing layouts here. 
   // RrLayoutEditor will handle its own selection.
 
+  @state()
+  private _isSettingsOpen = false;
+
   /**
    * Opens the settings dialog.
    */
   private _handleSettingsClick() {
-    const dialog = this.shadowRoot?.querySelector('sl-dialog') as any;
-    if (dialog) {
-      dialog.show();
-    }
+    this._isSettingsOpen = true;
   }
 
   /**
@@ -125,7 +125,11 @@ export class RrPage extends LitElement {
         <slot></slot>
       </main>
       
-      <sl-dialog label="Layout">
+      <sl-dialog 
+        label="Settings" 
+        .open=${this._isSettingsOpen} 
+        @sl-after-hide=${() => this._isSettingsOpen = false}
+      >
         <rr-settings></rr-settings>
       </sl-dialog>
     `;

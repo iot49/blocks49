@@ -17,4 +17,9 @@ export const statusBarStyles = css`
     display: inline-flex;
     align-items: center;
   }
+
+  .status-bar .layout-name {
+    cursor: pointer;
+    gap: 0.2rem;
+  }
 `;

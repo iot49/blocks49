@@ -110,7 +110,10 @@ export class Layout extends EventTarget {
     }
 
     setScale(scale: string) {
-        // TODO: Validate scale
+        if (!Scale2Number[scale]) {
+            console.warn(`Invalid scale: ${scale}`);
+            return;
+        }
         this._dataInternal = { ...this._dataInternal, scale };
         this._emitChange();
         this._resetLayoutTimer();
@@ -294,9 +297,7 @@ export class Layout extends EventTarget {
             console.log("Migrating: Creating layout...");
             const layout = await layoutClient.createLayout(layoutName, scale);
             
-            // 2. Update Details (Dimensions & Calibration)
-            // TODO: remove width/height, replace with referenceDistanceMm !!!
-            // p1/p2 are used for calibration, they have a distance of referenceDistanceMm, no width/height
+            // 2. Update Details (Calibration)
             const calibration = this.calibration;
             if (calibration && this._dataInternal.referenceDistanceMm) {
                  await layoutClient.updateLayout(layout.id, {
@@ -377,8 +378,17 @@ export class Layout extends EventTarget {
     private async _commitLayout() {
         console.log(`[Layout] Committing layout metadata...`);
         try {
-            const { images, ...metadata } = this._dataInternal;
-            await layoutClient.updateLayout(this.id, metadata);
+            // Only send editable fields. System fields (id, userId, etc.) can cause 400 Bad Request.
+            const { name, scale, referenceDistanceMm, p1x, p1y, p2x, p2y } = this._dataInternal;
+            await layoutClient.updateLayout(this.id, { 
+                name, 
+                scale, 
+                referenceDistanceMm, 
+                p1x, 
+                p1y, 
+                p2x, 
+                p2y 
+            });
             this._layoutCommitTimer = null;
         } catch (e) {
             console.error("Failed to commit layout metadata", e);

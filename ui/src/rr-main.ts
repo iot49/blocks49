@@ -51,9 +51,9 @@ export class RrMain extends LitElement {
    * For now, we just force update.
    */
   private _handleLayoutChange = (e: Event) => {
-      // Successive moves might still be firing on the old Layout instance 
-      // before the component re-renders with the new one.
-      // We clone the emitting instance to ensure we always have latest data.
+      // Re-trigger re-render of the app by replacing the provided context identity.
+      // This is the correct way for Lit context to propagate deep state changes
+      // when using mutable objects. Logic belongs here in the provider.
       const current = e.target as Layout;
       const next = new Layout(current);
       next.addEventListener('rr-layout-changed', this._handleLayoutChange);
@@ -71,8 +71,6 @@ export class RrMain extends LitElement {
       if (this._classifier && this._classifier.model === model && this._classifier.precision === precision) {
           return;
       }
-
-      console.log(`Setting classifier: ${model} (${precision})`);
       this._classifier = new Classifier(model, precision);
   }
 
@@ -89,7 +87,6 @@ export class RrMain extends LitElement {
   private _handleLayoutSelected = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       const layoutId = detail.layoutId;
-      console.log(`Loading layout: ${layoutId}`);
       if (layoutId) {
           this._layout.loadFromApi(layoutId).catch(err => {
               console.error("Failed to sync layout:", err);
