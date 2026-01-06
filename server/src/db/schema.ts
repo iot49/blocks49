@@ -31,11 +31,9 @@ export const layouts = sqliteTable('layouts', {
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
-// Images Table
 export const images = sqliteTable('images', {
     id: text('id').primaryKey(), // UUID
     layoutId: text('layout_id').references(() => layouts.id),
-    filename: text('filename'),
     labels: text('labels', { mode: 'json' }), // Stores Record<string, Point & { type: string }>
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });

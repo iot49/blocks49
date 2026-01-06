@@ -94,7 +94,6 @@ export async function load_r49_v2(file: File): Promise<Layout> {
             imageMeta.push({
                 id: crypto.randomUUID(),
                 layoutId: "", // Set later
-                filename: filename,
                 labels: labels,
                 createdAt: new Date().toISOString()
             });

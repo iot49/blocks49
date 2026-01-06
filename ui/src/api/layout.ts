@@ -174,8 +174,6 @@ export class Layout extends EventTarget {
         this._dataInternal.images.push({
             id: crypto.randomUUID(),
             layoutId: this._dataInternal.id,
-            filename: image.name,
-
             labels: {},
             createdAt: new Date().toISOString()
         });
@@ -187,11 +185,9 @@ export class Layout extends EventTarget {
         this._images = images;
         // Ensure metadata exists for each image
         while (this._dataInternal.images.length < images.length) {
-             const i = this._dataInternal.images.length;
-             this._dataInternal.images.push({
+              this._dataInternal.images.push({
                 id: crypto.randomUUID(),
                 layoutId: this._dataInternal.id,
-                filename: images[i].name,
                 labels: {},
                 createdAt: new Date().toISOString()
              });
@@ -229,13 +225,14 @@ export class Layout extends EventTarget {
             // Load Images
             this._images = [];
             const imgPromises = this._dataInternal.images.map(async (imgMeta) => {
-                const imgFile = zip.file(imgMeta.filename);
+                const filename = `${imgMeta.id}.jpg`;
+                const imgFile = zip.file(filename);
                 if (imgFile) {
                     const blob = await imgFile.async("blob");
-                    return new LayoutImage(blob, imgMeta.filename);
+                    return new LayoutImage(blob, filename);
                 } else {
-                    console.warn(`Image ${imgMeta.filename} not found in zip`);
-                    return new LayoutImage(new Blob(), imgMeta.filename); // Placeholder
+                    console.warn(`Image ${filename} not found in zip`);
+                    return new LayoutImage(new Blob(), filename); // Placeholder
                 }
             });
             
@@ -256,8 +253,7 @@ export class Layout extends EventTarget {
             // Reconstruct Images
             this._images = layout.images.map(img => {
                 const url = layoutClient.getImageUrl(img.id);
-                // Use filename or ID as name
-                return new LayoutImage(url, img.filename || 'image.jpg');
+                return new LayoutImage(url, `${img.id}.jpg`);
             });
 
             this._emitChange();
@@ -274,10 +270,12 @@ export class Layout extends EventTarget {
         const exportData = { ...this._dataInternal, version: 3 }; 
         zip.file("layout.json", JSON.stringify(exportData, null, 2));
         
-        // 2. Save Images
-        await Promise.all(this._images.map(async (img) => {
+        // 2. Save Images (Use ID as filename in ZIP)
+        await Promise.all(this._images.map(async (img, idx) => {
+            const imgMeta = this._dataInternal.images[idx];
+            const zipName = imgMeta ? `${imgMeta.id}.jpg` : img.name;
             const blob = await img.ensureBlob();
-            zip.file(img.name, blob);
+            zip.file(zipName, blob);
         }));
         
         // 3. Generate Blob & Save

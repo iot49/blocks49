@@ -94,17 +94,9 @@ app.get('/:id', async (c) => {
         }
     }
 
-    // 3. Serve File
-    const ext = image.filename?.split('.').pop()?.toLowerCase() || 'jpg';
-    const storageKey = `${image.id}.${ext}`; 
-    
-    const mimeMap: Record<string, string> = {
-        'jpg': 'image/jpeg',
-        'jpeg': 'image/jpeg',
-        'png': 'image/png',
-        'webp': 'image/webp'
-    };
-    const contentType = mimeMap[ext] || 'application/octet-stream';
+    // 3. Serve File (Forced to .jpg)
+    const storageKey = `${image.id}.jpg`; 
+    const contentType = 'image/jpeg';
     
     try {
         const buffer = await readFile(join(STORAGE_DIR, storageKey));

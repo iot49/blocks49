@@ -187,9 +187,8 @@ app.delete('/:id', async (c) => {
     // 2. Find and Delete Images from FS
     const layoutImages = await db.select().from(images).where(eq(images.layoutId, id)).all();
     for (const image of layoutImages) {
-        // Filename on disk uses image.id + original extension
-        const ext = image.filename?.split('.').pop()?.toLowerCase() || 'jpg';
-        const storageKey = `${image.id}.${ext}`; 
+        // Filename on disk uses image.id + .jpg
+        const storageKey = `${image.id}.jpg`; 
         const filePath = join(STORAGE_DIR, storageKey);
         try {
             await unlink(filePath);

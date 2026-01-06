@@ -81,21 +81,19 @@ app.post('/:layoutId/images', async (c) => {
         }
     }
 
-    // 3. Save File Locally
+    // 3. Save File Locally (Forcing .jpg as requested)
     await ensureDir();
     const imageId = randomUUID();
-    const extension = file.name.split('.').pop() || 'jpg';
-    const filename = `${imageId}.${extension}`;
+    const filename = `${imageId}.jpg`;
     const filePath = join(STORAGE_DIR, filename); // Flat structure for simple FS
     
     const buffer = await file.arrayBuffer();
     await writeFile(filePath, Buffer.from(buffer));
 
-    // 4. Save DB Record
+    // 4. Save DB Record (Removing filename field)
     const newImage = {
         id: imageId,
         layoutId: layout.id,
-        filename: file.name,
         labels: labelsJson,
         createdAt: new Date()
     };

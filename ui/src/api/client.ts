@@ -24,15 +24,13 @@ export interface ApiLayout {
 export interface ApiImage {
     id: UUID;
     layoutId: UUID;
-    // TODO: remove field - this is id.jpg
-    filename: string;
     labels?: Record<string, ApiMarker>;
     createdAt: string;
 }
 
 export interface ApiMarker {
     id: UUID,
-    x: number,
+    x: number, // Pixel coordinate
     y: number,
     type?: string,
 }

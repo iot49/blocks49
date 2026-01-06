@@ -45,9 +45,9 @@ export class RrLayoutEditor extends LitElement {
     };
   }
 
-  get images(): { filename: string, labels: any }[] {
+  get images(): { id: string, labels: any }[] {
     return this.layout.apiImages.map(img => ({
-      filename: img.filename,
+      id: img.id,
       labels: img.labels || {}
     }));
   }
