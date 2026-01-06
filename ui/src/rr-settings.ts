@@ -4,7 +4,6 @@ import { customElement, state } from 'lit/decorators.js';
 import { Layout, layoutContext, Scale2Number } from './api/layout';
 import { layoutClient } from './api/client.js';
 import { 
-  REF_LINE_COLOR, 
   MODEL_LIST, 
   PRECISION_OPTIONS,
   DEFAULT_MODEL,
@@ -185,12 +184,19 @@ export class RrSettings extends LitElement {
       <div class="settings-table">
         <div class="settings-row">
           <div class="settings-label">Name:</div>
-          <div class="settings-field">
+          <div class="settings-field" style="display: flex; gap: 1rem; align-items: center;">
             <sl-input
               value=${this.layoutName}
               @sl-input=${this._handleLayoutNameChange}
+              style="flex-grow: 1;"
             >
             </sl-input>
+            <sl-icon-button 
+                name="trash" 
+                label="Delete Layout"
+                style="font-size: 1.3rem; color: var(--sl-color-danger-600);"
+                @click=${() => this._handleDeleteLayout(this.layout.id)}
+            ></sl-icon-button>
           </div>
         </div>
         <div class="settings-row">
@@ -302,6 +308,9 @@ export class RrSettings extends LitElement {
   private async _handleDeleteLayout(id: string) {
       if (!confirm("Are you sure you want to delete this layout? This cannot be undone.")) return;
       
+      // Remove focus from the button to avoid 'Blocked aria-hidden' warnings during re-render
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+
       try {
           await layoutClient.deleteLayout(id);
           await this._fetchLayouts();
@@ -309,7 +318,6 @@ export class RrSettings extends LitElement {
           // If the deleted layout was the current one, we might want to switch or alert.
           // For now, let's just refresh the list.
           if (id === this.layout.id) {
-              alert("Current layout deleted. Selecting another layout...");
               if (this._layouts.length > 0) {
                    this.dispatchEvent(new CustomEvent('layout-selected', { 
                       detail: { layoutId: this._layouts[0].id },
@@ -321,6 +329,7 @@ export class RrSettings extends LitElement {
                   window.location.reload();
               }
           }
+          this.dispatchEvent(new CustomEvent('close-settings', { bubbles: true, composed: true }));
       } catch (e) {
           alert("Failed to delete layout");
           console.error(e);
@@ -328,7 +337,10 @@ export class RrSettings extends LitElement {
   }
 
   private async _handleCreateLayout() {
-    console.log("Creating layout", this._newLayoutName, this._newLayoutScale);
+      // Remove focus from the button to avoid 'Blocked aria-hidden' warnings during re-render
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+
+      console.log("Creating layout", this._newLayoutName, this._newLayoutScale);
       if (!this._newLayoutName) return alert("Name required");
       try {
           const layout = await layoutClient.createLayout(this._newLayoutName, this._newLayoutScale);
@@ -341,7 +353,7 @@ export class RrSettings extends LitElement {
               bubbles: true, 
               composed: true 
           }));
-          alert("Layout created! Please close settings.");
+          this.dispatchEvent(new CustomEvent('close-settings', { bubbles: true, composed: true }));
       } catch (e) {
           alert("Failed to create layout");
           console.error(e);

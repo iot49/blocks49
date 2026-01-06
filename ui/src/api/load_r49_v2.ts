@@ -106,7 +106,7 @@ export async function load_r49_v2(file: File): Promise<Layout> {
         name: manifest.layout.name || "Imported Layout",
         description: manifest.layout.description,
         scale: manifest.layout.scale || "HO",
-        referenceDistanceMm: referenceDistanceMm,
+        referenceDistanceMm: Math.round(referenceDistanceMm),
         // Map Calibration
         p1x: rect0.x,
         p1y: rect0.y,

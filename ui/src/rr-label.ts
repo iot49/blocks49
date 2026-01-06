@@ -1,12 +1,8 @@
 import { LitElement, html, css, svg } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import { consume } from '@lit/context';
-
 import { MARKER_SIZE_PX, REF_LINE_COLOR } from './app/config.ts';
-
-
 import { getMarkerDefs } from './styles/marker-defs.ts';
-
 import { Classifier, classifierContext } from './app/classifier.ts';
 import { type ApiMarker } from './api/client.js';
 import { type Layout, layoutContext } from './api/layout.ts';

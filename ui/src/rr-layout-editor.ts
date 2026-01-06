@@ -135,7 +135,6 @@ export class RrLayoutEditor extends LitElement {
       // b. Are there any other layouts?
       if (this._layouts.length > 0) {
           const firstLayout = this._layouts[0];
-          console.log(`[Startup] Selecting most recent layout: ${firstLayout.id}`);
           this._selectLayout(firstLayout.id);
           return;
       }
@@ -194,7 +193,7 @@ export class RrLayoutEditor extends LitElement {
               </sl-menu>
           </sl-dropdown>
           <span>Scale: ${layout.scale}</span>
-          <!-- <span>Ref Dist: ${layout.referenceDistanceMm ? layout.referenceDistanceMm.toFixed(0) : '?'} mm</span> -->
+          <!-- <span>[Ref] Dist: ${layout.referenceDistanceMm ? layout.referenceDistanceMm.toFixed(0) : '?'} mm</span> -->
           <span>Resolution: ${dpt > 0 ? Math.round(dpt) + ' dpt' : 'Not Calibrated'}</span>
       </div>
     `;
