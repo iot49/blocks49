@@ -76,17 +76,19 @@ export async function load_r49_v2(file: File): Promise<Layout> {
             const layoutImage = new LayoutImage(blob, filename);
             images.push(layoutImage);
             
-            // Map Labels
+            // Map Labels (Filtering out 'train-end' as it is no longer supported)
             const labels: Record<string, ApiMarker> = {};
             if (entry.labels) {
-                Object.entries(entry.labels).forEach(([id, m]: [string, any]) => {
-                    labels[id] = {
-                        id,
-                        x: m.x,
-                        y: m.y,
-                        type: m.type || 'track'
-                    };
-                });
+                Object.entries(entry.labels)
+                    .filter(([_, m]: [string, any]) => m.type !== 'train-end')
+                    .forEach(([id, m]: [string, any]) => {
+                        labels[id] = {
+                            id,
+                            x: m.x,
+                            y: m.y,
+                            type: m.type || 'track'
+                        };
+                    });
             }
 
             imageMeta.push({

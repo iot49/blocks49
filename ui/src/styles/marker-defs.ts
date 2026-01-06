@@ -26,13 +26,6 @@ export function getMarkerDefs(symbolSize: number) {
           d="M1 2.5A2.5 2.5 0 0 1 3.5 0h9A2.5 2.5 0 0 1 15 2.5v9c0 .818-.393 1.544-1 2v2a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5-.5V14H5v1.5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5-.5v-2a2.5 2.5 0 0 1-1-2zM3.5 1A1.5 1.5 0 0 0 2 2.5v9A1.5 1.5 0 0 0 3.5 13h9a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 12.5 1z"
         />
       </symbol>
-      <symbol id="train-end" width=${symbolSize} height=${symbolSize} viewBox="8 8 24 24" stroke="cyan">
-        <rect width="16" height="16" rx="3" ry="3" fill="white" fill-opacity="0.6" stroke="none" style="cursor: pointer;" />
-        <path
-          fill-rule="evenodd"
-          d="M6 8a.5.5 0 0 0 .5.5h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 0 0-.708.708L12.293 7.5H6.5A.5.5 0 0 0 6 8m-2.5 7a.5.5 0 0 1-.5-.5v-13a.5.5 0 0 1 1 0v13a.5.5 0 0 1-.5.5"
-        />
-      </symbol>
       <symbol id="coupling" width=${symbolSize} height=${symbolSize} viewBox="8 8 24 24" stroke="lightgreen">
         <rect width="16" height="16" rx="3" ry="3" fill="white" fill-opacity="0.6" stroke="none" style="cursor: pointer;" />
         <path

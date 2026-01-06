@@ -260,12 +260,6 @@ export class RrLayoutEditor extends LitElement {
       ${this._renderToolButton('Label as Track', 'sign-railroad', 'track', disabled)}
       ${this._renderToolButton('Label as Train Car', 'truck-front', 'train', disabled)}
       ${this._renderToolButton(
-      'Label as Train Front/Back',
-      'arrow-bar-right',
-      'train-end',
-      disabled,
-    )}
-      ${this._renderToolButton(
       'Label as Train Coupling',
       'arrows-collapse-vertical',
       'coupling',
