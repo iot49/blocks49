@@ -14,7 +14,6 @@ self.onmessage = async (e: MessageEvent) => {
             
             // Only re-initialize if changed
             if (!classifier || currentModel !== model || currentPrecision !== precision) {
-                console.log(`[Worker] Initializing classifier: ${model} (${precision})`);
                 classifier = new Classifier(model, precision);
                 await classifier.initialize();
                 currentModel = model;

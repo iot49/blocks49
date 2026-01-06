@@ -140,7 +140,6 @@ export class RrLayoutEditor extends LitElement {
       }
 
       // c. Backend is empty, load demo.r49
-      console.log("[Startup] Backend is empty. Loading demo.r49...");
       const response = await fetch('demo.r49');
       if (!response.ok) return;
       const blob = await response.blob();
@@ -324,15 +323,22 @@ export class RrLayoutEditor extends LitElement {
   private async _load_r49(file: File) {
     try {
       await this.layout.load(file);
-      this.currentImageIndex = 0;
 
       // Ensure the auto-loaded demo is named "demo" as per requirement
       if (file.name === 'demo.r49') {
           this.layout.setName('demo');
       }
 
+      // Check for existing layout with same name
+      const existing = this._layouts.find(l => l.name === this.layout.name);
+      if (existing) {
+          this._selectLayout(existing.id);
+          return;
+      }
+
+      this.currentImageIndex = 0;
+
       // Auto-migrate to backend
-      console.log("Auto-migrating loaded layout to backend...");
       const newId = await this.layout.migrateToBackend();
       
       // Dispatch event to sync and refresh UI

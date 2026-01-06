@@ -152,12 +152,6 @@ export class RrLiveView extends LitElement {
               inferenceTimeMs,
               executionProvider
           };
-          
-          if (Object.keys(results).length > 0) {
-              // console.log(`[LiveView] Results (${Object.keys(results).length} markers):`, results);
-          } else {
-              console.log("[LiveView] No markers detected");
-          }
       }
   }
 

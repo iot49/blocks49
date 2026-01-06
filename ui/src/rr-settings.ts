@@ -340,7 +340,6 @@ export class RrSettings extends LitElement {
       // Remove focus from the button to avoid 'Blocked aria-hidden' warnings during re-render
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 
-      console.log("Creating layout", this._newLayoutName, this._newLayoutScale);
       if (!this._newLayoutName) return alert("Name required");
       try {
           const layout = await layoutClient.createLayout(this._newLayoutName, this._newLayoutScale);

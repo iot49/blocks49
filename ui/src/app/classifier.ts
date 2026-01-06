@@ -120,15 +120,11 @@ export class Classifier {
             graphOptimizationLevel: 'all'
         };
 
-        console.log(`[Classifier] Initializing session with providers:`, options.executionProviders);
-        if (typeof navigator !== 'undefined' && (navigator as any).gpu) {
-            console.log("[Classifier] WebGPU is available in this environment.");
-        } else {
+        if (typeof navigator !== 'undefined' && !(navigator as any).gpu) {
             console.warn("[Classifier] WebGPU is NOT detected in this environment (navigator.gpu is missing).");
         }
 
         this._session = await ort.InferenceSession.create(input, options);
-        console.log(`[Classifier] ${this.model} (${this.precision}) loaded. Backend: ${this.executionProvider}`);
     } catch (e) {
         console.error(`[Classifier] Session Init Failed:`, e);
         throw e;

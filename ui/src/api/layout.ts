@@ -209,7 +209,6 @@ export class Layout extends EventTarget {
                 const jsonText = await manifestFile.async("string");
                 const json = JSON.parse(jsonText);
                 if (json.version === 2) {
-                    console.log("Loading Legacy V2 File...");
                     const result = await load_r49_v2(file) as any;
                     
                     // Copy state from loaded layout to this instance
@@ -294,7 +293,6 @@ export class Layout extends EventTarget {
         
         try {
             // 1. Create Layout
-            console.log("Migrating: Creating layout...");
             const layout = await layoutClient.createLayout(layoutName, scale);
             
             // 2. Update Details (Calibration)
@@ -311,7 +309,6 @@ export class Layout extends EventTarget {
             }
 
             // 3. Upload Images
-            console.log(`Migrating: Uploading ${this._images.length} images...`);
             for (let i = 0; i < this._images.length; i++) {
                 const img = this._images[i];
                 // We don't have local labels easily accessible unless we look at _dataInternal
@@ -332,8 +329,6 @@ export class Layout extends EventTarget {
                 if (this._dataInternal?.images?.[i]) {
                      labels = this._dataInternal.images[i].labels || {};
                 }
-
-                console.log(`[Layout] Image ${i} labels before upload:`, labels);
                 
                 const blob = await img.ensureBlob();
                 if (blob) {
@@ -344,7 +339,6 @@ export class Layout extends EventTarget {
             }
 
             // 4. Reload from API (Sync)
-            console.log("Migrating: Syncing...");
             await this.loadFromApi(layout.id);
             
             return layout.id;
@@ -376,7 +370,6 @@ export class Layout extends EventTarget {
     }
 
     private async _commitLayout() {
-        console.log(`[Layout] Committing layout metadata...`);
         try {
             // Only send editable fields. System fields (id, userId, etc.) can cause 400 Bad Request.
             const { name, scale, referenceDistanceMm, p1x, p1y, p2x, p2y } = this._dataInternal;
@@ -396,7 +389,6 @@ export class Layout extends EventTarget {
     }
 
     private async _commitMarkers(imageId: string) {
-        console.log(`[Layout] Committing markers for image ${imageId}...`);
         try {
             const imgMeta = this._dataInternal.images.find(img => img.id === imageId);
             if (imgMeta) {
