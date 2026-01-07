@@ -130,6 +130,7 @@ export class RrPage extends LitElement {
         .open=${this._isSettingsOpen} 
         @sl-after-hide=${() => this._isSettingsOpen = false}
         @close-settings=${() => this._isSettingsOpen = false}
+        style="--width: 600px;"
       >
         <rr-settings></rr-settings>
       </sl-dialog>

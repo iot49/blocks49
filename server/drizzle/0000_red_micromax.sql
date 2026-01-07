@@ -11,6 +11,8 @@ CREATE TABLE `layouts` (
 	`user_id` text,
 	`name` text NOT NULL,
 	`description` text,
+	`classifier` text,
+	`mqtt_url` text,
 	`p1_x` real,
 	`p1_y` real,
 	`p2_x` real,
@@ -26,6 +28,8 @@ CREATE TABLE `users` (
 	`id` text PRIMARY KEY NOT NULL,
 	`email` text NOT NULL,
 	`role` text DEFAULT 'user',
+	`profile` text,
+	`mqtt_broker` text DEFAULT 'ws://localhost:8083/mqtt',
 	`created_at` integer
 );
 --> statement-breakpoint

@@ -42,6 +42,9 @@ export class Layout extends EventTarget {
     get layout(): ApiLayout { return this._dataInternal; }
     
     get name(): string { return this._dataInternal.name; }
+    get description(): string { return this._dataInternal.description || ''; }
+    get classifier(): string { return this._dataInternal.classifier || ''; }
+    get mqttUrl(): string { return this._dataInternal.mqttUrl || ''; }
 
     
     get calibration(): { p1: Point, p2: Point } { 
@@ -109,6 +112,24 @@ export class Layout extends EventTarget {
         this._resetLayoutTimer();
     }
 
+    setDescription(description: string) {
+        this._dataInternal = { ...this._dataInternal, description };
+        this._emitChange();
+        this._resetLayoutTimer();
+    }
+
+    setClassifier(classifier: string) {
+        this._dataInternal = { ...this._dataInternal, classifier };
+        this._emitChange();
+        this._resetLayoutTimer();
+    }
+
+    setMqttUrl(mqttUrl: string) {
+        this._dataInternal = { ...this._dataInternal, mqttUrl };
+        this._emitChange();
+        this._resetLayoutTimer();
+    }
+
     setScale(scale: string) {
         if (!Scale2Number[scale]) {
             console.warn(`Invalid scale: ${scale}`);
@@ -125,14 +146,14 @@ export class Layout extends EventTarget {
         this._resetLayoutTimer();
     }
 
-    setMarker(imageIndex: number, id: string, x: number, y: number, type: string = 'track') {
+    setMarker(imageIndex: number, id: string, x: number, y: number, type: string = 'track', alias?: string) {
         if (imageIndex < 0 || imageIndex >= this._dataInternal.images.length) return;
         
         const newImages = [...this._dataInternal.images];
         const img = { ...newImages[imageIndex] };
         img.markers = { ...(img.markers || {}) };
         
-        img.markers[id] = { id, x: Math.round(x), y: Math.round(y), type };
+        img.markers[id] = { id, x: Math.round(x), y: Math.round(y), type, alias };
         newImages[imageIndex] = img;
         
         this._dataInternal = { ...this._dataInternal, images: newImages };
@@ -388,9 +409,12 @@ export class Layout extends EventTarget {
     private async _commitLayout() {
         try {
             // Only send editable fields. System fields (id, userId, etc.) can cause 400 Bad Request.
-            const { name, scale, referenceDistanceMm, p1x, p1y, p2x, p2y } = this._dataInternal;
+            const { name, description, classifier, mqttUrl, scale, referenceDistanceMm, p1x, p1y, p2x, p2y } = this._dataInternal;
             await layoutClient.updateLayout(this.id, { 
                 name, 
+                description,
+                classifier,
+                mqttUrl,
                 scale, 
                 referenceDistanceMm, 
                 p1x, 

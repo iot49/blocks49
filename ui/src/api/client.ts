@@ -5,6 +5,8 @@ export interface ApiLayout {
     userId: UUID;
     name: string;
     description?: string;
+    classifier?: string;   // format "model/precision"
+    mqttUrl?: string;
     scale: string;
     
     // Calibration Points
@@ -21,6 +23,15 @@ export interface ApiLayout {
     updatedAt: string;
 }
 
+export interface ApiUser {
+    id: UUID;
+    email: string;
+    role: string;
+    profile?: string;
+    mqttBroker?: string;
+    createdAt: string;
+}
+
 export interface ApiImage {
     id: UUID;
     layoutId: UUID;
@@ -33,6 +44,7 @@ export interface ApiMarker {
     x: number, // Pixel coordinate
     y: number,
     type?: string,
+    alias?: string, // user friendly name
 }
 
 
@@ -45,6 +57,24 @@ export class LayoutClient {
         if (!res.ok) throw new Error(`Failed to fetch layouts: ${res.statusText} (${res.status})`);
         const data = await res.json();
         return data.layouts;
+    }
+
+    async me(): Promise<ApiUser> {
+        const res = await fetch(`${API_BASE}/users/me`);
+        if (!res.ok) throw new Error(`Failed to fetch user: ${res.statusText} (${res.status})`);
+        const data = await res.json();
+        return data.user;
+    }
+
+    async updateUser(updates: Partial<ApiUser>): Promise<ApiUser> {
+        const res = await fetch(`${API_BASE}/users/me`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates)
+        });
+        if (!res.ok) throw new Error(`Failed to update user: ${res.statusText} (${res.status})`);
+        const data = await res.json();
+        return data.user;
     }
 
     async getLayout(id: string): Promise<ApiLayout> {

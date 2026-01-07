@@ -47,8 +47,10 @@ async function ensureUserId(email: string): Promise<string> {
 // Schema for Creating/Updating Layouts
 const layoutSchema = z.object({
   name: z.string().min(1),
-  description: z.string().optional(),
-  scale: z.enum(['N', 'HO', 'Z', 'O', 'G']).default('N'), // Extend as needed
+  description: z.string().optional().nullable(),
+  classifier: z.string().optional().nullable(),
+  mqttUrl: z.string().optional().nullable(),
+  scale: z.enum(['G', 'O', 'S', 'HO', 'T', 'N', 'Z']).default('HO'),
 });
 
 // GET /api/layouts - List All User Layouts
@@ -123,15 +125,15 @@ app.get('/:id', async (c) => {
 // Schema for Partial Updates
 const patchLayoutSchema = z.object({
     name: z.string().min(1).optional(),
-    description: z.string().optional(),
-    scale: z.enum(['N', 'HO', 'Z', 'O', 'G']).optional(),
-    p1x: z.number().optional(),
-    p1y: z.number().optional(),
-    p2x: z.number().optional(),
-    p2y: z.number().optional(),
-    referenceDistanceMm: z.number().optional(),
-    width: z.number().optional(),
-    height: z.number().optional(),
+    description: z.string().optional().nullable(),
+    classifier: z.string().optional().nullable(),
+    mqttUrl: z.string().optional().nullable(),
+    scale: z.enum(['G', 'O', 'S', 'HO', 'T', 'N', 'Z']).optional(),
+    p1x: z.number().optional().nullable(),
+    p1y: z.number().optional().nullable(),
+    p2x: z.number().optional().nullable(),
+    p2y: z.number().optional().nullable(),
+    referenceDistanceMm: z.number().optional().nullable(),
 });
 
 // PATCH /api/layouts/:id - Update

@@ -22,6 +22,7 @@ app.get('/health', (c) => {
 import layoutRoutes from './routes/layouts.js';
 import layoutImageRoutes from './routes/layouts_images.js';
 import imageRoutes from './routes/images.js';
+import userRoutes from './routes/users.js';
 
 // Protect API routes
 app.use('/api/*', authMiddleware);
@@ -30,6 +31,7 @@ app.use('/api/*', authMiddleware);
 app.route('/api/layouts', layoutRoutes);
 app.route('/api/layouts', layoutImageRoutes); // Adds POST /api/layouts/:id/images
 app.route('/api/images', imageRoutes); // Adds GET /api/images/:id
+app.route('/api/users', userRoutes); // Adds /api/users/me
 app.onError((err, c) => {
   console.error(`[App Error] ${err.message}`);
   console.error(err.stack);

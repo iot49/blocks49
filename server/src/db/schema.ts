@@ -5,6 +5,8 @@ export const users = sqliteTable('users', {
   id: text('id').primaryKey(), // UUID
   email: text('email').notNull().unique(),
   role: text('role').default('user'), // 'admin' | 'user'
+  profile: text('profile'),
+  mqttBroker: text('mqtt_broker').default('ws://localhost:8083/mqtt'),
   createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });
 
@@ -14,6 +16,8 @@ export const layouts = sqliteTable('layouts', {
   userId: text('user_id').references(() => users.id),
   name: text('name').notNull(),
   description: text('description'),
+  classifier: text('classifier'), // format "model/precision"
+  mqttUrl: text('mqtt_url'),
   
   // Calibration: 2-Point Line System
   p1x: real('p1_x'),

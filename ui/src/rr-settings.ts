@@ -22,6 +22,11 @@ export class RrSettings extends LitElement {
       display: block;
       width: 100%;
       height: 100%;
+      box-sizing: border-box;
+    }
+    
+    * {
+      box-sizing: border-box;
     }
 
     .settings-table {
@@ -48,9 +53,11 @@ export class RrSettings extends LitElement {
     }
 
     sl-input,
+    sl-textarea,
     sl-dropdown,
     sl-select {
-      width: 200px;
+      width: 100%;
+      max-width: 300px;
     }
 
     /* Classifier Tab Styles */
@@ -77,15 +84,17 @@ export class RrSettings extends LitElement {
 
   @state()
   private _layouts: any[] = [];
-
+  @state()
+  private _user: any = null;
   @state()
   private _newLayoutName: string = 'Layout';
-
   @state()
   private _newLayoutScale: string = 'HO';
 
   // Helper getters
   get layoutName() { return this.layout?.layout?.name || ''; }
+  get layoutDescription() { return this.layout?.layout?.description || ''; }
+  get layoutMqttUrl() { return this.layout?.layout?.mqttUrl || ''; }
   get layoutScale() { return this.layout?.layout?.scale || 'HO'; }
   // Backend uses referenceDistanceMm.
   get layoutReferenceDistance() { return this.layout?.layout?.referenceDistanceMm || 0; }
@@ -95,6 +104,15 @@ export class RrSettings extends LitElement {
       super.connectedCallback();
       this._parseUrlParams();
       this._fetchLayouts();
+      this._fetchUser();
+  }
+
+  private async _fetchUser() {
+      try {
+          this._user = await layoutClient.me();
+      } catch (e) {
+          console.error("Failed to fetch user", e);
+      }
   }
 
   private async _fetchLayouts() {
@@ -120,27 +138,44 @@ export class RrSettings extends LitElement {
       const urlModel = params.get('model');
       const urlPrecision = params.get('precision');
 
-      // 1. Resolve Model (URL > LocalStorage > Default)
+      // 1. Resolve Model (Layout Metadata > URL > LocalStorage > Default)
       let model = urlModel;
+      
+      const layoutClassifier = this.layout?.layout?.classifier;
+      if (layoutClassifier) {
+          const parts = layoutClassifier.split('/');
+          if (parts.length === 2 && MODEL_LIST.includes(parts[0])) {
+              model = parts[0];
+          }
+      }
+
       if (!model || !MODEL_LIST.includes(model)) {
           model = localStorage.getItem('rr-selected-model');
           if (!model || !MODEL_LIST.includes(model)) {
               model = DEFAULT_MODEL;
           }
       }
-      this._selectedModel = model;
-      localStorage.setItem('rr-selected-model', model); // Sync/Update persistence
+      this._selectedModel = model!;
+      localStorage.setItem('rr-selected-model', model!); // Sync/Update persistence
 
-      // 2. Resolve Precision (URL > LocalStorage > Default)
+      // 2. Resolve Precision (Layout Metadata > URL > LocalStorage > Default)
       let precision = urlPrecision;
+
+      if (layoutClassifier) {
+          const parts = layoutClassifier.split('/');
+          if (parts.length === 2 && PRECISION_OPTIONS.includes(parts[1])) {
+              precision = parts[1];
+          }
+      }
+
       if (!precision || !PRECISION_OPTIONS.includes(precision)) {
           precision = localStorage.getItem('rr-selected-precision');
           if (!precision || !PRECISION_OPTIONS.includes(precision)) {
               precision = DEFAULT_PRECISION;
           }
       }
-      this._selectedPrecision = precision;
-      localStorage.setItem('rr-selected-precision', precision); // Sync/Update persistence
+      this._selectedPrecision = precision!;
+      localStorage.setItem('rr-selected-precision', precision!); // Sync/Update persistence
 
       // Emit initial state
       this._emitChange();
@@ -160,16 +195,16 @@ export class RrSettings extends LitElement {
   render() {
     return html`
       <sl-tab-group>
+        <sl-tab slot="nav" panel="profile">Profile</sl-tab>
         <sl-tab slot="nav" panel="layout">Layout</sl-tab>
-        <sl-tab slot="nav" panel="classifier">Classifier</sl-tab>
         <sl-tab slot="nav" panel="project">Projects</sl-tab>
+
+        <sl-tab-panel name="profile">
+          ${this._renderProfileSettings()}
+        </sl-tab-panel>
 
         <sl-tab-panel name="layout">
           ${this._renderLayoutSettings()}
-        </sl-tab-panel>
-
-        <sl-tab-panel name="classifier">
-          ${this._renderClassifierSettings()}
         </sl-tab-panel>
 
         <sl-tab-panel name="project">
@@ -179,9 +214,62 @@ export class RrSettings extends LitElement {
     `;
   }
 
+  private _renderProfileSettings() {
+      if (!this._user) return html`<div style="padding: 1rem;"><sl-spinner></sl-spinner></div>`;
+      return html`
+        <div style="padding: 1rem;">
+          <div class="settings-table">
+            <div class="settings-row">
+                <div class="settings-label">Email:</div>
+                <div class="settings-field">
+                    <sl-input value=${this._user.email} readonly disabled></sl-input>
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="settings-label">Role:</div>
+                <div class="settings-field">
+                    <sl-input value=${this._user.role} readonly disabled></sl-input>
+                </div>
+            </div>
+            <sl-divider></sl-divider>
+            <div class="settings-row">
+                <div class="settings-label">Profile Info:</div>
+                <div class="settings-field">
+                    <sl-textarea 
+                        value=${this._user.profile || ''} 
+                        @sl-change=${(e: any) => this._handleUserUpdate({ profile: e.target.value })}
+                        placeholder="Enter personal information"
+                    ></sl-textarea>
+                </div>
+            </div>
+            <div class="settings-row">
+                <div class="settings-label">MQTT Broker:</div>
+                <div class="settings-field">
+                    <sl-input 
+                        value=${this._user.mqttBroker || ''} 
+                        @sl-change=${(e: any) => this._handleUserUpdate({ mqttBroker: e.target.value })}
+                        placeholder="mqtt://localhost:1883"
+                    ></sl-input>
+                </div>
+            </div>
+          </div>
+        </div>
+      `;
+  }
+
+  private async _handleUserUpdate(updates: Partial<any>) {
+      try {
+          this._user = await layoutClient.updateUser(updates);
+      } catch (e) {
+          console.error("Failed to update user", e);
+          alert("Failed to update profile");
+      }
+  }
+
   private _renderLayoutSettings() {
     return html`
-      <div class="settings-table">
+      <div style="padding: 1rem;">
+        <div class="settings-table">
         <div class="settings-row">
           <div class="settings-label">Name:</div>
           <div class="settings-field" style="display: flex; gap: 1rem; align-items: center;">
@@ -200,6 +288,17 @@ export class RrSettings extends LitElement {
           </div>
         </div>
         <div class="settings-row">
+          <div class="settings-label">Description:</div>
+          <div class="settings-field">
+            <sl-textarea
+              value=${this.layoutDescription}
+              @sl-change=${(e: any) => this.layout.setDescription(e.target.value)}
+              placeholder="Layout description..."
+            ></sl-textarea>
+          </div>
+        </div>
+        <sl-divider></sl-divider>
+        <div class="settings-row">
           <div class="settings-label">Ref Dist [mm]:</div>
           <div class="settings-field">
             <sl-input
@@ -208,9 +307,6 @@ export class RrSettings extends LitElement {
               @sl-change=${this._handleReferenceDistanceChange}
             ></sl-input>
           </div>
-        </div>
-        <div class="settings-row">
-           <!-- Placeholder for eventual other settings -->
         </div>
         <div class="settings-row">
           <div class="settings-label">Scale:</div>
@@ -230,31 +326,34 @@ export class RrSettings extends LitElement {
             </sl-dropdown>
           </div>
         </div>
+        <sl-divider></sl-divider>
+        <div class="settings-row">
+            <div class="settings-label">Model:</div>
+            <div class="settings-field">
+                <sl-radio-group 
+                    value=${this._selectedModel}
+                    @sl-change=${this._handleModelChange}
+                >
+                    ${MODEL_LIST.map(m => html`<sl-radio-button value=${m}>${m}</sl-radio-button>`)}
+                </sl-radio-group>
+            </div>
+        </div>
+        <div class="settings-row">
+            <div class="settings-label">Precision:</div>
+            <div class="settings-field">
+                <sl-radio-group 
+                    value=${this._selectedPrecision}
+                    @sl-change=${this._handlePrecisionChange}
+                >
+                    ${PRECISION_OPTIONS.map(p => html`<sl-radio-button value=${p}>${p}</sl-radio-button>`)}
+                </sl-radio-group>
+            </div>
+        </div>
       </div>
-    `;
+    </div>
+      `;
   }
 
-  private _renderClassifierSettings() {
-    return html`
-      <div class="classifier-settings">
-          <sl-radio-group 
-              label="Model" 
-              value=${this._selectedModel}
-              @sl-change=${this._handleModelChange}
-          >
-              ${MODEL_LIST.map(m => html`<sl-radio-button value=${m}>${m}</sl-radio-button>`)}
-          </sl-radio-group>
-
-          <sl-radio-group 
-              label="Precision" 
-              value=${this._selectedPrecision}
-              @sl-change=${this._handlePrecisionChange}
-          >
-              ${PRECISION_OPTIONS.map(p => html`<sl-radio-button value=${p}>${p}</sl-radio-button>`)}
-          </sl-radio-group>
-      </div>
-    `;
-  }
 
   private _renderProjectSettings() {
       return html`
@@ -362,12 +461,14 @@ export class RrSettings extends LitElement {
   private _handleModelChange(e: CustomEvent) {
       this._selectedModel = (e.target as any).value;
       localStorage.setItem('rr-selected-model', this._selectedModel);
+      this.layout.setClassifier(`${this._selectedModel}/${this._selectedPrecision}`);
       this._emitChange();
   }
 
   private _handlePrecisionChange(e: CustomEvent) {
       this._selectedPrecision = (e.target as any).value;
       localStorage.setItem('rr-selected-precision', this._selectedPrecision);
+      this.layout.setClassifier(`${this._selectedModel}/${this._selectedPrecision}`);
       this._emitChange();
   }
 
