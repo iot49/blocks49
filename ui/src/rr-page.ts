@@ -100,8 +100,8 @@ export class RrPage extends LitElement {
   }
 
   render() {
-    // BUG: sl-select is always blank. Also, it should be part 
-    // the status slot in rr-layout-editor where it should allow to select the Layout, not here (should not show in rr-live-view).
+    // todo: replace sl-icon with sl-button-icon that toggles between icons 'camera-video' (live-view active)
+    // and 'tools'
     return html`
       <header>
         <div class="left-align">

@@ -102,9 +102,15 @@ export class RrSettings extends LitElement {
 
   connectedCallback() {
       super.connectedCallback();
-      this._parseUrlParams();
+      this._initClassifierSettings();
       this._fetchLayouts();
       this._fetchUser();
+  }
+
+  willUpdate(changedProperties: Map<string, any>) {
+      if (changedProperties.has('layout')) {
+          this._initClassifierSettings();
+      }
   }
 
   private async _fetchUser() {
@@ -133,15 +139,11 @@ export class RrSettings extends LitElement {
       return `Layout-${i}`;
   }
 
-  private _parseUrlParams() {
-      const params = new URLSearchParams(window.location.search);
-      const urlModel = params.get('model');
-      const urlPrecision = params.get('precision');
-
-      // 1. Resolve Model (Layout Metadata > URL > LocalStorage > Default)
-      let model = urlModel;
-      
+  private _initClassifierSettings() {
+      // 1. Resolve Model (Layout Metadata > LocalStorage > Default)
+      let model = null;
       const layoutClassifier = this.layout?.layout?.classifier;
+      
       if (layoutClassifier) {
           const parts = layoutClassifier.split('/');
           if (parts.length === 2 && MODEL_LIST.includes(parts[0])) {
@@ -156,10 +158,9 @@ export class RrSettings extends LitElement {
           }
       }
       this._selectedModel = model!;
-      localStorage.setItem('rr-selected-model', model!); // Sync/Update persistence
 
-      // 2. Resolve Precision (Layout Metadata > URL > LocalStorage > Default)
-      let precision = urlPrecision;
+      // 2. Resolve Precision (Layout Metadata > LocalStorage > Default)
+      let precision = null;
 
       if (layoutClassifier) {
           const parts = layoutClassifier.split('/');
@@ -175,9 +176,12 @@ export class RrSettings extends LitElement {
           }
       }
       this._selectedPrecision = precision!;
-      localStorage.setItem('rr-selected-precision', precision!); // Sync/Update persistence
 
-      // Emit initial state
+      // Sync/Update local storage persistence (optional but keeps consistency)
+      localStorage.setItem('rr-selected-model', this._selectedModel);
+      localStorage.setItem('rr-selected-precision', this._selectedPrecision);
+
+      // Emit initial state to core
       this._emitChange();
   }
 
