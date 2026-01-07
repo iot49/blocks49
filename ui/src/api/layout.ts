@@ -190,14 +190,43 @@ export class Layout extends EventTarget {
         }
     }
 
-    addImage(image: LayoutImage) {
+    async addImage(image: LayoutImage) {
+        // If we have a layout ID (persistent), upload it immediately
+        let backendMeta = null;
+        if (this.id) {
+            try {
+                const blob = await image.ensureBlob();
+                const file = new File([blob], image.name, { type: blob.type });
+                backendMeta = await layoutClient.uploadImage(this.id, file);
+            } catch (e) {
+                console.error("Failed to upload image to backend", e);
+            }
+        }
+
         this._images.push(image);
-        this._dataInternal.images.push({
+        this._dataInternal.images.push(backendMeta || {
             id: crypto.randomUUID(),
             layoutId: this._dataInternal.id,
             markers: {},
             createdAt: new Date().toISOString()
         });
+
+        // If this is the FIRST image, initialize calibration based on its size
+        if (this._images.length === 1 && !this._dataInternal.p1x && !this._dataInternal.p1y && !this._dataInternal.p2x && !this._dataInternal.p2y) {
+            try {
+                const bitmap = await image.getBitmap();
+                if (bitmap) {
+                    const w = bitmap.width;
+                    const h = bitmap.height;
+                    this.setCalibration({ x: w * 0.1, y: h * 0.1 }, { x: w * 0.9, y: h * 0.9 });
+                }
+            } catch (e) {
+                console.warn("Could not determine image size for initial calibration", e);
+                // Fallback to 1000x1000 square
+                this.setCalibration({ x: 100, y: 100 }, { x: 900, y: 900 });
+            }
+        }
+
         this._emitChange();
     }
     

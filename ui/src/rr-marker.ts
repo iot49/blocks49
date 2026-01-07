@@ -39,13 +39,30 @@ type MarkerCategory = 'marker' | 'calibration';
 export class RrMarker extends LitElement {
   static styles = css`
     :host {
-      display: block;
+      display: flex;
+      flex-direction: column;
       width: 100%;
+      height: 100%;
+      min-height: 0;
+      background-color: var(--sl-color-neutral-100);
+    }
+
+    .canvas-wrapper {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
     }
 
     svg {
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 100%;
-      height: auto;
+      height: 100%;
       display: block;
     }
 
@@ -296,10 +313,11 @@ export class RrMarker extends LitElement {
     // Also use this for scale shim in updateSymbolSize if needed
 
     return html`
-      <div style="position: relative; width: 100%; height: 100%;" @mousedown=${this.handleMouseDown}>
+      <div class="canvas-wrapper" @mousedown=${this.handleMouseDown}>
         <svg
           id="svg"
           viewBox=${viewBox}
+          style="aspect-ratio: ${imageWidth} / ${imageHeight};"
           @mousemove=${this.handleMouseMove}
           @click=${this.handleClick}
         >

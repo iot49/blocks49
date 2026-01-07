@@ -316,9 +316,19 @@ export class RrLiveView extends LitElement {
     const w = this._video?.videoWidth || 100;
     const h = this._video?.videoHeight || 100;
 
-    // Calculate scale factors for rendering
-    const manifestW = 1000;
-    const manifestH = 1000;
+    // BUG: wrong marker position. Let's fix this later and focus on rr-marker for now.
+    // Fix: Use actual layout resolution for scaling factors
+    const firstImg = this.layout?._images?.[0];
+    
+    // We MUST have the image dimensions to scale correctly
+    // If not loaded yet, try to trigger a load (but don't await here to keep render fast)
+    if (firstImg && firstImg.width === 0) {
+        firstImg.getBitmap(); 
+    }
+
+    const manifestW = firstImg?.width || 1000;
+    const manifestH = firstImg?.height || 1000;
+    
     const scaleX = w / manifestW;
     const scaleY = h / manifestH;
 

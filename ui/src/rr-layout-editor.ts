@@ -356,7 +356,7 @@ export class RrLayoutEditor extends LitElement {
       const { LayoutImage } = await import('./api/layout-image');
       const img = new LayoutImage(file, file.name);
       // validate? R49File did validation. Layout.addImage doesn't validation yet.
-      this.layout.addImage(img);
+      await this.layout.addImage(img);
 
       // Switch to the new image
       const newIndex = this.images.length - 1;

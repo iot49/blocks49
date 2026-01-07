@@ -85,14 +85,20 @@ export class RrMain extends LitElement {
    * Loads the selected layout from the API.
    */
   private _handleLayoutSelected = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      const layoutId = detail.layoutId;
-      if (layoutId) {
-          this._layout.loadFromApi(layoutId).catch(err => {
-              console.error("Failed to sync layout:", err);
-              alert("Failed to load layout. See console.");
-          });
-      }
+    const detail = (e as CustomEvent).detail;
+    const layoutId = detail.layoutId;
+    if (layoutId) {
+      localStorage.setItem('rr-active-layout-id', layoutId);
+      this._loadLayout(layoutId);
+    }
+  }
+
+  private async _loadLayout(layoutId: string) {
+    try {
+      await this._layout.loadFromApi(layoutId);
+    } catch (err) {
+      console.error("Failed to sync layout:", err);
+    }
   }
 
   static styles = css`
@@ -109,6 +115,12 @@ export class RrMain extends LitElement {
     this.addEventListener('rr-view-toggle', this._handleViewToggle as EventListener);
     this.addEventListener('rr-classifier-settings-change', this._handleClassifierSettingsChange as EventListener);
     this.addEventListener('layout-selected', this._handleLayoutSelected as EventListener);
+
+    // Restore session
+    const lastId = localStorage.getItem('rr-active-layout-id');
+    if (lastId) {
+      this._loadLayout(lastId);
+    }
   }
 
   disconnectedCallback() {

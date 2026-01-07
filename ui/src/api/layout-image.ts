@@ -4,6 +4,8 @@ export class LayoutImage {
     private _url: string | null = null;
     private _objectURL: string | null = null;
     private _bitmap: ImageBitmap | null = null;
+    private _width: number = 0;
+    private _height: number = 0;
     public name: string;
 
     constructor(source: Blob | string, name: string) {
@@ -40,8 +42,13 @@ export class LayoutImage {
         if (this._bitmap) return this._bitmap;
         const blob = await this.ensureBlob();
         this._bitmap = await createImageBitmap(blob);
+        this._width = this._bitmap.width;
+        this._height = this._bitmap.height;
         return this._bitmap;
     }
+
+    get width(): number { return this._width; }
+    get height(): number { return this._height; }
     
     dispose() {
         if (this._objectURL && this._blob) {

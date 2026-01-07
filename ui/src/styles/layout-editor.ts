@@ -45,7 +45,7 @@ export const layoutEditorStyles = css`
       padding: 0;
       display: flex;
       flex-direction: column;
-      overflow: auto;
+      overflow: hidden;
       min-height: 0;
       position: relative;
     }
@@ -133,6 +133,7 @@ export const layoutEditorStyles = css`
     }
 
     rr-marker {
-      display: block;
+      flex-grow: 1;
+      min-height: 0;
     }
 `;
