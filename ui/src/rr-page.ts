@@ -64,6 +64,25 @@ export class RrPage extends LitElement {
       min-height: 0;
       position: relative;
     }
+
+    sl-icon-button::part(base) {
+      color: white;
+      transition: background-color 0.2s, color 0.2s, transform 0.2s;
+      border-radius: var(--sl-border-radius-circle);
+    }
+
+    sl-icon-button::part(base):hover,
+    sl-icon-button::part(base):focus-visible {
+      background-color: rgba(255, 255, 255, 0.2);
+      color: white;
+      transform: scale(1.1);
+    }
+
+    sl-icon-button::part(base):active {
+      background-color: rgba(255, 255, 255, 0.3);
+      color: white;
+      transform: scale(1.0);
+    }
   `;
 
   // No longer managing layouts here. 
@@ -95,7 +114,7 @@ export class RrPage extends LitElement {
                 name=${this.viewMode === 'live' ? 'camera-video' : 'tools' } 
                 @click=${this._handleViewToggle} 
                 title=${this.viewMode === 'live' ? 'Switch to Editor' : 'Switch to Live View'}
-                style="font-size: 1.5rem; color: white;"
+                style="font-size: 1.5rem;"
             ></sl-icon-button>
             
             <slot name="status"></slot>
@@ -105,7 +124,7 @@ export class RrPage extends LitElement {
             <sl-icon-button
             name="gear"
             label="Settings"
-            style="font-size: 1.5rem; color: white;"
+            style="font-size: 1.5rem;"
             @click=${this._handleSettingsClick}
           ></sl-icon-button>
         </div>
