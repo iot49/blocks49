@@ -198,7 +198,7 @@ export class RrLayoutEditor extends LitElement {
     `;
 
     return html`
-      <rr-page>
+      <rr-page viewMode="editor">
         ${statusTemplate}
         <div class="container">
           <nav>${this._fileToolsTemplate()} ${this._labelToolsTemplate()}</nav>

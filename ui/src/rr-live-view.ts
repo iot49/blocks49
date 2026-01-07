@@ -338,7 +338,7 @@ export class RrLiveView extends LitElement {
     `;
 
     return html`
-      <rr-page>
+      <rr-page viewMode="live">
         ${statusTemplate}
         <div style="position: relative; width: 100%; height: 100%;">
             <video></video>

@@ -1,5 +1,5 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, state, property } from 'lit/decorators.js';
 import '@shoelace-style/shoelace/dist/components/dialog/dialog.js';
 import '@shoelace-style/shoelace/dist/components/select/select.js';
 import '@shoelace-style/shoelace/dist/components/option/option.js';
@@ -17,6 +17,8 @@ import './rr-settings.ts';
  */
 @customElement('rr-page')
 export class RrPage extends LitElement {
+  @property({ type: String })
+  viewMode: 'editor' | 'live' = 'editor';
   // ... styles ...
   static styles = css`
     :host {
@@ -53,21 +55,6 @@ export class RrPage extends LitElement {
       gap: 0.5em;
     }
 
-    .view-toggle {
-        cursor: pointer;
-        font-size: 1.2rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 1.5em;
-        height: 1.5em;
-        border-radius: 50%;
-        transition: background-color 0.2s;
-    }
-    
-    .view-toggle:hover {
-        background-color: rgba(255, 255, 255, 0.2);
-    }
 
     main {
       flex-grow: 1;
@@ -100,14 +87,16 @@ export class RrPage extends LitElement {
   }
 
   render() {
-    // todo: replace sl-icon with sl-button-icon that toggles between icons 'camera-video' (live-view active)
-    // and 'tools'
     return html`
       <header>
         <div class="left-align">
-            <div class="view-toggle" @click=${this._handleViewToggle} title="Toggle View">
-               <sl-icon name="list"></sl-icon>
-            </div>
+            <sl-icon-button 
+                class="view-toggle"
+                name=${this.viewMode === 'live' ? 'camera-video' : 'tools' } 
+                @click=${this._handleViewToggle} 
+                title=${this.viewMode === 'live' ? 'Switch to Editor' : 'Switch to Live View'}
+                style="font-size: 1.5rem; color: white;"
+            ></sl-icon-button>
             
             <slot name="status"></slot>
         </div>
