@@ -34,6 +34,6 @@ export const layouts = sqliteTable('layouts', {
 export const images = sqliteTable('images', {
     id: text('id').primaryKey(), // UUID
     layoutId: text('layout_id').references(() => layouts.id),
-    labels: text('labels', { mode: 'json' }), // Stores Record<string, Point & { type: string }>
+    markers: text('markers', { mode: 'json' }), // Stores Record<string, ApiMarker>
     createdAt: integer('created_at', { mode: 'timestamp' }).$defaultFn(() => new Date()),
 });

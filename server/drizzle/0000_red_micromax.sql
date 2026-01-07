@@ -1,8 +1,7 @@
 CREATE TABLE `images` (
 	`id` text PRIMARY KEY NOT NULL,
 	`layout_id` text,
-	`filename` text,
-	`labels` text,
+	`markers` text,
 	`created_at` integer,
 	FOREIGN KEY (`layout_id`) REFERENCES `layouts`(`id`) ON UPDATE no action ON DELETE no action
 );

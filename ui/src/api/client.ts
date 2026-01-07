@@ -24,7 +24,7 @@ export interface ApiLayout {
 export interface ApiImage {
     id: UUID;
     layoutId: UUID;
-    labels?: Record<string, ApiMarker>;
+    markers?: Record<string, ApiMarker>;
     createdAt: string;
 }
 
@@ -84,11 +84,11 @@ export class LayoutClient {
         if (!res.ok) throw new Error(`Failed to delete layout: ${res.statusText} (${res.status})`);
     }
 
-    async uploadImage(layoutId: string, file: File, labels?: Record<string, any>): Promise<ApiImage> {
+    async uploadImage(layoutId: string, file: File, markers?: Record<string, any>): Promise<ApiImage> {
         const formData = new FormData();
         formData.append('file', file);
-        if (labels) {
-            formData.append('labels', JSON.stringify(labels));
+        if (markers) {
+            formData.append('labels', JSON.stringify(markers));
         }
 
         const res = await fetch(`${API_BASE}/layouts/${layoutId}/images`, {

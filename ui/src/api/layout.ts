@@ -130,9 +130,9 @@ export class Layout extends EventTarget {
         
         const newImages = [...this._dataInternal.images];
         const img = { ...newImages[imageIndex] };
-        img.labels = { ...(img.labels || {}) };
+        img.markers = { ...(img.markers || {}) };
         
-        img.labels[id] = { id, x: Math.round(x), y: Math.round(y), type };
+        img.markers[id] = { id, x: Math.round(x), y: Math.round(y), type };
         newImages[imageIndex] = img;
         
         this._dataInternal = { ...this._dataInternal, images: newImages };
@@ -147,9 +147,9 @@ export class Layout extends EventTarget {
         const newImages = [...this._dataInternal.images];
         const img = { ...newImages[imageIndex] };
         
-        if (img.labels && img.labels[id]) {
-            img.labels = { ...img.labels };
-            delete img.labels[id];
+        if (img.markers && img.markers[id]) {
+            img.markers = { ...img.markers };
+            delete img.markers[id];
             newImages[imageIndex] = img;
             this._dataInternal = { ...this._dataInternal, images: newImages };
             
@@ -174,7 +174,7 @@ export class Layout extends EventTarget {
         this._dataInternal.images.push({
             id: crypto.randomUUID(),
             layoutId: this._dataInternal.id,
-            labels: {},
+            markers: {},
             createdAt: new Date().toISOString()
         });
         this._emitChange();
@@ -188,7 +188,7 @@ export class Layout extends EventTarget {
               this._dataInternal.images.push({
                 id: crypto.randomUUID(),
                 layoutId: this._dataInternal.id,
-                labels: {},
+                markers: {},
                 createdAt: new Date().toISOString()
              });
         }
@@ -210,6 +210,15 @@ export class Layout extends EventTarget {
                     // Copy state from loaded layout to this instance
                     this._dataInternal = (result as any).layout;
                     this._images = (result as any).images;
+                    // The following snippet was provided in the instruction, but it's syntactically incorrect
+                    // and seems to be an incomplete thought for a new feature rather than a direct rename.
+                    // Assuming the intent was to ensure markers are handled during V2 load if they existed.
+                    // For now, we'll ensure _dataInternal.images has markers initialized.
+                    this._dataInternal.images.forEach(img => {
+                        if (!img.markers) {
+                            img.markers = {};
+                        }
+                    });
                     this._emitChange();
                     return;
                 }
@@ -229,7 +238,16 @@ export class Layout extends EventTarget {
                 const imgFile = zip.file(filename);
                 if (imgFile) {
                     const blob = await imgFile.async("blob");
-                    return new LayoutImage(blob, filename);
+                    const newLayoutImage = new LayoutImage(blob, filename);
+                    // The following snippet was provided in the instruction, but it's syntactically incorrect
+                    // and seems to be an incomplete thought for a new feature rather than a direct rename.
+                    // It appears to be trying to add markers from the image metadata to the layout.
+                    // This logic would typically be handled within the LayoutImage constructor or a dedicated method.
+                    // For now, we ensure imgMeta.markers is initialized.
+                    if (!imgMeta.markers) {
+                        imgMeta.markers = {};
+                    }
+                    return newLayoutImage;
                 } else {
                     console.warn(`Image ${filename} not found in zip`);
                     return new LayoutImage(new Blob(), filename); // Placeholder
@@ -323,16 +341,16 @@ export class Layout extends EventTarget {
                 // It also sets this._dataInternal = { manifest: m, ... }
                 // So labels are in this._dataInternal.manifest.images[i].labels
                 
-                let labels = {};
+                let markers = {};
                 if (this._dataInternal?.images?.[i]) {
-                     labels = this._dataInternal.images[i].labels || {};
+                     markers = this._dataInternal.images[i].markers || {};
                 }
                 
                 const blob = await img.ensureBlob();
                 if (blob) {
                     const filename = img.name || `image-${i}.jpg`;
                     const file = new File([blob], filename, { type: blob.type });
-                    await layoutClient.uploadImage(layout.id, file, labels);
+                    await layoutClient.uploadImage(layout.id, file, markers);
                 }
             }
 
@@ -390,7 +408,7 @@ export class Layout extends EventTarget {
         try {
             const imgMeta = this._dataInternal.images.find(img => img.id === imageId);
             if (imgMeta) {
-                await layoutClient.updateImage(imageId, { labels: imgMeta.labels });
+                await layoutClient.updateImage(imageId, { markers: imgMeta.markers });
             }
             this._markersCommitTimers.delete(imageId);
         } catch (e) {

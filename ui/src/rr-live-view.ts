@@ -7,7 +7,8 @@ import { Classifier, classifierContext } from './app/classifier.ts';
 import { statusBarStyles } from './styles/status-bar.ts';
 import { getMarkerDefs } from './styles/marker-defs.ts';
 import { getCameraStream } from './app/capture.ts';
-
+import mqtt from 'mqtt';
+import type { MqttClient } from 'mqtt';
 
 interface LiveMarker {
   id: string;
@@ -67,6 +68,9 @@ export class RrLiveView extends LitElement {
   /** ID for the requestAnimationFrame loop. */
   private _loopId: number | null = null;
 
+  /** MQTT client for publishing results. */
+  private _mqttClient: MqttClient | null = null;
+
   /** Timestamp of the last successful UI state update. */
   private _lastDisplayUpdateTime = 0;
 
@@ -78,6 +82,7 @@ export class RrLiveView extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
     this._initWorker();
+    this._initMqtt();
     await this._startCamera();
     this._startLoop();
   }
@@ -87,6 +92,7 @@ export class RrLiveView extends LitElement {
     this._stopCamera();
     this._stopLoop();
     this._terminateWorker();
+    this._terminateMqtt();
   }
 
   /**
@@ -132,13 +138,13 @@ export class RrLiveView extends LitElement {
   private _handleWorkerResults(results: Record<string, string>, inferenceTimeMs: number, executionProvider: string) {
       this._isWorkerBusy = false;
       
-      const labels = this.layout?.apiImages?.[0]?.labels;
-      if (!labels) return;
+      const markers = this.layout?.apiImages?.[0]?.markers;
+      if (!markers) return;
 
       const classificationResults: LiveMarker[] = Object.entries(results).map(([id, prediction]) => ({
           id,
-          x: labels[id]?.x || 0,
-          y: labels[id]?.y || 0,
+          x: markers[id]?.x || 0,
+          y: markers[id]?.y || 0,
           prediction
       }));
 
@@ -153,6 +159,51 @@ export class RrLiveView extends LitElement {
               executionProvider
           };
       }
+
+      this._publishResults(classificationResults);
+  }
+
+  private _initMqtt() {
+      if (this._mqttClient) return;
+      
+      const brokerUrl = `ws://${window.location.hostname}:8083/mqtt`;
+      this._mqttClient = mqtt.connect(brokerUrl, {
+          clientId: `rails49_ui_${Math.random().toString(16).slice(2, 10)}`,
+          clean: true,
+          connectTimeout: 4000,
+          reconnectPeriod: 1000,
+      });
+
+      this._mqttClient.on('connect', () => {
+          console.log('[MQTT] Connected to NanoMQ');
+      });
+
+      this._mqttClient.on('error', (err) => {
+          console.error('[MQTT] Connection error:', err);
+      });
+  }
+
+  private _terminateMqtt() {
+      if (this._mqttClient) {
+          this._mqttClient.end();
+          this._mqttClient = null;
+      }
+  }
+
+  private _publishResults(markers: LiveMarker[]) {
+      if (!this._mqttClient || !this._mqttClient.connected) return;
+
+      const payload = {
+          timestamp: Date.now(),
+          layoutId: this.layout?.id,
+          markers: markers.map(m => ({ id: m.id, prediction: m.prediction })),
+          metrics: {
+              inferenceTimeMs: this._displayState.inferenceTimeMs,
+              tTotMs: this._tTotMs
+          }
+      };
+
+      this._mqttClient.publish('rails49/live/predictions', JSON.stringify(payload), { qos: 0 });
   }
 
   /**
@@ -224,8 +275,8 @@ export class RrLiveView extends LitElement {
     if (!this.layout || !this.layout.apiImages || this.layout.apiImages.length === 0) return;
     if (!this._worker) return;
 
-    const labels = this.layout.apiImages[0].labels;
-    if (!labels) return;
+    const markersData = this.layout.apiImages[0].markers;
+    if (!markersData) return;
 
     const dpt = this.layout.dots_per_track;
     if (dpt <= 0) return;
@@ -237,7 +288,7 @@ export class RrLiveView extends LitElement {
 
         // Extract marker positions to simplify worker payload
         const markers: Record<string, {x: number, y: number}> = {};
-        for (const [id, marker] of Object.entries(labels)) {
+        for (const [id, marker] of Object.entries(markersData)) {
             markers[id] = { 
                 x: marker.x, 
                 y: marker.y

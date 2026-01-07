@@ -4,7 +4,7 @@ import './rr-page.ts';
 import './rr-layout-editor.ts';
 import './rr-live-view.ts';
 
-import './rr-label.ts';
+import './rr-marker.ts';
 
 import '@shoelace-style/shoelace/dist/components/button/button.js';
 import '@shoelace-style/shoelace/dist/components/dialog/dialog.js';

@@ -23,10 +23,10 @@ interface ValidationResult {
   };
 }
 
-type MarkerCategory = 'label' | 'calibration';
+type MarkerCategory = 'marker' | 'calibration';
 
 /**
- * RrLabel is an interactive canvas for viewing and labeling layout images.
+ * RrMarker is an interactive canvas for viewing and placing markers on layout images.
  * 
  * It manages:
  * - Rendering the layout image and overlaying markers (Track, Train, etc.).
@@ -35,8 +35,8 @@ type MarkerCategory = 'label' | 'calibration';
  * - Real-time marker validation using the provided Classifier.
  * - Deep validation/debugging via a floating popup (Shift-click/Debug tool).
  */
-@customElement('rr-label')
-export class RrLabel extends LitElement {
+@customElement('rr-marker')
+export class RrMarker extends LitElement {
   static styles = css`
     :host {
       display: block;
@@ -222,17 +222,17 @@ export class RrLabel extends LitElement {
     if (!layout) return;
     const currentImageIndex = this.imageIndex;
     const currentImage = layout.apiImages[currentImageIndex];
-    if (!currentImage?.labels || !this._imageBitmap || !this.classifier) return;
+    if (!currentImage?.markers || !this._imageBitmap || !this.classifier) return;
     
     const img_dpt = layout.dots_per_track;
     if (img_dpt <= 0) return; 
 
-    const labels = Object.entries(currentImage.labels);
+    const markers = Object.entries(currentImage.markers);
     let resultsChanged = false;
     const newResults = { ...this.validationResults };
 
     // Identify which markers need (re)validation
-    const tasks = labels.map(async ([id, m]) => {
+    const tasks = markers.map(async ([id, m]) => {
         const marker = m as ApiMarker;
         // Skip if we already have a valid result for this exact biomarker (type + pos)
         const prev = this.validationResults[id];
@@ -266,16 +266,16 @@ export class RrLabel extends LitElement {
         } catch (e) {
             // We already added a silent catch in classifier.ts for detatched bitmaps,
             // so we don't need to do much here except avoid crashing.
-            console.debug(`[rr-label] Classification skipped for ${id}:`, e);
+            console.debug(`[rr-marker] Classification skipped for ${id}:`, e);
         }
     });
 
     await Promise.all(tasks);
 
     // If marker set changed (some markers deleted), prune them from results
-    const labelIds = new Set(labels.map(([id]) => id));
+    const markerIds = new Set(markers.map(([id]) => id));
     for (const id in newResults) {
-        if (!labelIds.has(id)) {
+        if (!markerIds.has(id)) {
             delete newResults[id];
             resultsChanged = true;
         }
@@ -312,7 +312,7 @@ export class RrLabel extends LitElement {
             width=${imageWidth}
             height=${imageHeight}
           ></image>
-          ${this.markerTemplate('label')} ${this.imageIndex === 0 ? this.calibrationTemplate() : svg``}
+          ${this.markerTemplate('marker')} ${this.imageIndex === 0 ? this.calibrationTemplate() : svg``}
         </svg>
         <div id="debug-popup-container" 
              class="debug-popup"
@@ -324,8 +324,8 @@ export class RrLabel extends LitElement {
 
   private markerTemplate(category: MarkerCategory) {
     if (!this.layout || !this.layout.apiImages[this.imageIndex]) return svg``;
-    const markers = this.layout.apiImages[this.imageIndex].labels || {};
-    // console.log(`[rr-label] Rendering ${Object.keys(markers).length} markers for image ${this.imageIndex}`, markers);
+    const markers = this.layout.apiImages[this.imageIndex].markers || {};
+    // console.log(`[rr-marker] Rendering ${Object.keys(markers).length} markers for image ${this.imageIndex}`, markers);
     return svg`
       ${Object.entries(markers).map(([markerId, m]) => {
         const marker = m as ApiMarker; 
@@ -468,7 +468,7 @@ export class RrLabel extends LitElement {
 
   private handleMouseDown = (event: MouseEvent) => {
     const target = event.target as HTMLElement | SVGElement;
-    const marker = target.closest('[id].label, [id].calibration');
+    const marker = target.closest('[id].marker, [id].calibration');
     
     if (!marker) return;
 
@@ -476,12 +476,12 @@ export class RrLabel extends LitElement {
     const classList = marker.classList;
 
     if (this.activeTool === 'delete') {
-      if (classList.contains('label')) {
+      if (classList.contains('marker')) {
         this.layout.deleteMarker(this.imageIndex, id);
       }
     } else {
-      if (classList.contains('label')) {
-        this.dragHandle = { id, category: 'label' };
+      if (classList.contains('marker')) {
+        this.dragHandle = { id, category: 'marker' };
       } else if (classList.contains('calibration')) {
         this.dragHandle = { id, category: 'calibration' };
       }
@@ -508,8 +508,8 @@ export class RrLabel extends LitElement {
       let type = 'track';
       const img = this.layout.apiImages?.[this.imageIndex];
       
-      if (img?.labels?.[this.dragHandle.id]) {
-        type = img.labels[this.dragHandle.id].type || 'track';
+      if (img?.markers?.[this.dragHandle.id]) {
+        type = img.markers[this.dragHandle.id].type || 'track';
       }
       
       this.layout.setMarker(

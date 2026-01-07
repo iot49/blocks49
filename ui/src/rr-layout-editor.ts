@@ -15,7 +15,7 @@ import { layoutClient, type ApiLayout } from './api/client.js';
  * - The status bar showing layout metadata (name, scale, size, DPT).
  * - A sidebar with file tools (Open/Save) and labeling tools (Track, Train, etc.).
  * - An image carousel (thumbnail bar) for navigating between captured images.
- * - The main layout view (rendered via `rr-label`).
+ * - The main layout view (rendered via `rr-marker`).
  * 
  * It also handles the initial loading of the demo project if no images are present.
  */
@@ -45,10 +45,10 @@ export class RrLayoutEditor extends LitElement {
     };
   }
 
-  get images(): { id: string, labels: any }[] {
+  get images(): { id: string, markers: any }[] {
     return this.layout.apiImages.map(img => ({
       id: img.id,
-      labels: img.labels || {}
+      markers: img.markers || {}
     }));
   }
 
@@ -256,16 +256,16 @@ export class RrLayoutEditor extends LitElement {
     const disabled = this.currentImageIndex < 0 || !this.manifest?.layout?.referenceDistanceMm;
 
     return html` <div class="toolbar-group">
-      ${this._renderToolButton('Label as Other', 'question-circle', 'other', disabled)}
-      ${this._renderToolButton('Label as Track', 'sign-railroad', 'track', disabled)}
-      ${this._renderToolButton('Label as Train Car', 'truck-front', 'train', disabled)}
+      ${this._renderToolButton('Place Other', 'question-circle', 'other', disabled)}
+      ${this._renderToolButton('Place Track', 'sign-railroad', 'track', disabled)}
+      ${this._renderToolButton('Place Train Car', 'truck-front', 'train', disabled)}
       ${this._renderToolButton(
-      'Label as Train Coupling',
+      'Place Train Coupling',
       'arrows-collapse-vertical',
       'coupling',
       disabled,
     )}
-      ${this._renderToolButton('Delete Label', 'trash3', 'delete', disabled)}
+      ${this._renderToolButton('Delete Marker', 'trash3', 'delete', disabled)}
       ${this._renderToolButton('Debug (Log Coordinates)', 'check-circle', 'debug', disabled)}
     </div>`;
   }
@@ -308,10 +308,10 @@ export class RrLayoutEditor extends LitElement {
 
   private _renderMainContent() {
     // Default view
-    return html` <rr-label
+    return html` <rr-marker
       .imageIndex=${this.currentImageIndex}
       .activeTool=${this.activeTool}
-    ></rr-label>`;
+    ></rr-marker>`;
   }
 
   private async _load_r49(file: File) {

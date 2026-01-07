@@ -61,8 +61,11 @@ app.patch('/:id', async (c) => {
 
     // 3. Perform Update
     const updateData: any = {};
-    if (body.labels !== undefined) {
-        updateData.labels = body.labels;
+    if (body.markers !== undefined) {
+        updateData.markers = body.markers;
+    } else if (body.labels !== undefined) {
+        // Compatibility for transition
+        updateData.markers = body.labels;
     }
     // Add other fields if needed
 

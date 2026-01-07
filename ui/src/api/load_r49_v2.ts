@@ -3,6 +3,9 @@ import { Layout } from './layout';
 import { LayoutImage } from './layout-image';
 import type { ApiLayout, ApiImage, ApiMarker } from './client';
 
+// reads legacy V2 .r49 files and converts them to V3
+// remove once all legacy files have been converted
+
 export async function load_r49_v2(file: File): Promise<Layout> {
     const zip = await JSZip.loadAsync(file);
     const manifestFile = zip.file("manifest.json");
@@ -76,13 +79,13 @@ export async function load_r49_v2(file: File): Promise<Layout> {
             const layoutImage = new LayoutImage(blob, filename);
             images.push(layoutImage);
             
-            // Map Labels (Filtering out 'train-end' as it is no longer supported)
-            const labels: Record<string, ApiMarker> = {};
+            // Map Markers (Filtering out 'train-end' as it is no longer supported)
+            const markers: Record<string, ApiMarker> = {};
             if (entry.labels) {
                 Object.entries(entry.labels)
                     .filter(([_, m]: [string, any]) => m.type !== 'train-end')
                     .forEach(([id, m]: [string, any]) => {
-                        labels[id] = {
+                        markers[id] = {
                             id,
                             x: m.x,
                             y: m.y,
@@ -94,7 +97,7 @@ export async function load_r49_v2(file: File): Promise<Layout> {
             imageMeta.push({
                 id: crypto.randomUUID(),
                 layoutId: "", // Set later
-                labels: labels,
+                markers: markers,
                 createdAt: new Date().toISOString()
             });
         }

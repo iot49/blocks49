@@ -132,7 +132,7 @@ export const layoutEditorStyles = css`
       min-height: 0;
     }
 
-    rr-label {
+    rr-marker {
       display: block;
     }
 `;
