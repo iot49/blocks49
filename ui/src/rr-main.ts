@@ -1,8 +1,11 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
-import { provide } from '@lit/context';
+import { provide, createContext } from '@lit/context';
 import { Layout, layoutContext } from './api/layout';
 import { Classifier, classifierContext } from './app/classifier.ts';
+import { type ApiUser, layoutClient } from './api/client.js';
+
+export const userContext = createContext<ApiUser | undefined>('user');
 
 /**
  * RrMain is the root component of the application.
@@ -19,6 +22,10 @@ export class RrMain extends LitElement {
   @provide({ context: layoutContext })
   @state()
   private _layout: Layout;
+
+  @provide({ context: userContext })
+  @state()
+  private _user: ApiUser | undefined;
 
   /* 
      State Management:
@@ -101,6 +108,14 @@ export class RrMain extends LitElement {
     }
   }
 
+  private async _loadUser() {
+    try {
+        this._user = await layoutClient.me();
+    } catch (e) {
+        console.error("Failed to load user info", e);
+    }
+  }
+
   static styles = css`
     :host {
       display: flex;
@@ -115,6 +130,8 @@ export class RrMain extends LitElement {
     this.addEventListener('rr-view-toggle', this._handleViewToggle as EventListener);
     this.addEventListener('rr-classifier-settings-change', this._handleClassifierSettingsChange as EventListener);
     this.addEventListener('layout-selected', this._handleLayoutSelected as EventListener);
+
+    this._loadUser();
 
     // Restore session
     const lastId = localStorage.getItem('rr-active-layout-id');

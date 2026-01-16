@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "lsof -ti :5173 | xargs kill -9 2>/dev/null || true",
     "dev": "concurrently \"vite\" \"npm run dev --prefix ../server\"",
     "build": "tsc && vite build",
     "preview": "vite preview",

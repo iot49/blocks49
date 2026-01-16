@@ -49,7 +49,8 @@ const layoutSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional().nullable(),
   classifier: z.string().optional().nullable(),
-  mqttUrl: z.string().optional().nullable(),
+  mqttBroker: z.string().optional().nullable(),
+  mqttTopic: z.string().optional().nullable(),
   scale: z.enum(['G', 'O', 'S', 'HO', 'T', 'N', 'Z']).default('HO'),
 });
 
@@ -127,7 +128,8 @@ const patchLayoutSchema = z.object({
     name: z.string().min(1).optional(),
     description: z.string().optional().nullable(),
     classifier: z.string().optional().nullable(),
-    mqttUrl: z.string().optional().nullable(),
+    mqttBroker: z.string().optional().nullable(),
+    mqttTopic: z.string().optional().nullable(),
     scale: z.enum(['G', 'O', 'S', 'HO', 'T', 'N', 'Z']).optional(),
     p1x: z.number().optional().nullable(),
     p1y: z.number().optional().nullable(),

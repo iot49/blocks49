@@ -94,7 +94,7 @@ export class RrSettings extends LitElement {
   // Helper getters
   get layoutName() { return this.layout?.layout?.name || ''; }
   get layoutDescription() { return this.layout?.layout?.description || ''; }
-  get layoutMqttUrl() { return this.layout?.layout?.mqttUrl || ''; }
+  get layoutMqttTopic() { return this.layout?.mqttTopic || ''; }
   get layoutScale() { return this.layout?.layout?.scale || 'HO'; }
   // Backend uses referenceDistanceMm.
   get layoutReferenceDistance() { return this.layout?.layout?.referenceDistanceMm || 0; }
@@ -351,6 +351,17 @@ export class RrSettings extends LitElement {
                 >
                     ${PRECISION_OPTIONS.map(p => html`<sl-radio-button value=${p}>${p}</sl-radio-button>`)}
                 </sl-radio-group>
+            </div>
+        </div>
+        <sl-divider></sl-divider>
+        <div class="settings-row">
+            <div class="settings-label">MQTT Topic:</div>
+            <div class="settings-field">
+                <sl-input 
+                    value=${this.layoutMqttTopic} 
+                    @sl-change=${(e: any) => this.layout.setMqttTopic(e.target.value)}
+                    placeholder="marker/predict"
+                ></sl-input>
             </div>
         </div>
       </div>

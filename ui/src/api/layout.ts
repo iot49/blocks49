@@ -44,7 +44,7 @@ export class Layout extends EventTarget {
     get name(): string { return this._dataInternal.name; }
     get description(): string { return this._dataInternal.description || ''; }
     get classifier(): string { return this._dataInternal.classifier || ''; }
-    get mqttUrl(): string { return this._dataInternal.mqttUrl || ''; }
+    get mqttTopic(): string { return this._dataInternal.mqttTopic || ''; }
 
     
     get calibration(): { p1: Point, p2: Point } { 
@@ -124,8 +124,8 @@ export class Layout extends EventTarget {
         this._resetLayoutTimer();
     }
 
-    setMqttUrl(mqttUrl: string) {
-        this._dataInternal = { ...this._dataInternal, mqttUrl };
+    setMqttTopic(mqttTopic: string) {
+        this._dataInternal = { ...this._dataInternal, mqttTopic };
         this._emitChange();
         this._resetLayoutTimer();
     }
@@ -449,12 +449,12 @@ export class Layout extends EventTarget {
     private async _commitLayout() {
         try {
             // Only send editable fields. System fields (id, userId, etc.) can cause 400 Bad Request.
-            const { name, description, classifier, mqttUrl, scale, referenceDistanceMm, p1x, p1y, p2x, p2y } = this._dataInternal;
+            const { name, description, classifier, mqttTopic, scale, referenceDistanceMm, p1x, p1y, p2x, p2y } = this._dataInternal;
             await layoutClient.updateLayout(this.id, { 
                 name, 
                 description,
                 classifier,
-                mqttUrl,
+                mqttTopic,
                 scale, 
                 referenceDistanceMm, 
                 p1x, 

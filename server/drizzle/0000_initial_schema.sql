@@ -12,7 +12,7 @@ CREATE TABLE `layouts` (
 	`name` text NOT NULL,
 	`description` text,
 	`classifier` text,
-	`mqtt_url` text,
+	`mqtt_topic` text DEFAULT 'marker/predict',
 	`p1_x` real,
 	`p1_y` real,
 	`p2_x` real,
@@ -29,7 +29,9 @@ CREATE TABLE `users` (
 	`email` text NOT NULL,
 	`role` text DEFAULT 'user',
 	`profile` text,
-	`mqtt_broker` text DEFAULT 'ws://localhost:8083/mqtt',
+	`mqtt_broker` text DEFAULT 'ws://localhost:8083',
+	`active` integer DEFAULT true,
+	`login_at` integer,
 	`created_at` integer
 );
 --> statement-breakpoint

@@ -6,7 +6,7 @@ export interface ApiLayout {
     name: string;
     description?: string;
     classifier?: string;   // format "model/precision"
-    mqttUrl?: string;
+    mqttTopic?: string;
     scale: string;
     
     // Calibration Points
@@ -29,6 +29,8 @@ export interface ApiUser {
     role: string;
     profile?: string;
     mqttBroker?: string;
+    active?: boolean;
+    loginAt?: string;
     createdAt: string;
 }
 

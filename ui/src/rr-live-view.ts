@@ -3,6 +3,8 @@ import { LitElement, html, css, svg } from 'lit';
 import { customElement, state, query } from 'lit/decorators.js';
 import { consume } from '@lit/context';
 import { type Layout, layoutContext } from './api/layout.ts';
+import { userContext } from './rr-main.ts';
+import { type ApiUser } from './api/client.js';
 import { Classifier, classifierContext } from './app/classifier.ts';
 import { statusBarStyles } from './styles/status-bar.ts';
 import { getMarkerDefs } from './styles/marker-defs.ts';
@@ -39,6 +41,10 @@ export class RrLiveView extends LitElement {
   @consume({ context: classifierContext, subscribe: true })
   @state()
   classifier: Classifier | undefined;
+
+  @consume({ context: userContext, subscribe: true })
+  @state()
+  private _user: ApiUser | undefined;
 
 
 
@@ -166,7 +172,8 @@ export class RrLiveView extends LitElement {
   private _initMqtt() {
       if (this._mqttClient) return;
       
-      const brokerUrl = `ws://${window.location.hostname}:8083/mqtt`;
+      const brokerUrl = this._user?.mqttBroker || `ws://${window.location.hostname}:8083`;
+      console.log(`[MQTT] Connecting to ${brokerUrl}...`);
       this._mqttClient = mqtt.connect(brokerUrl, {
           clientId: `rails49_ui_${Math.random().toString(16).slice(2, 10)}`,
           clean: true,
@@ -203,7 +210,8 @@ export class RrLiveView extends LitElement {
           }
       };
 
-      this._mqttClient.publish('rails49/live/predictions', JSON.stringify(payload), { qos: 0 });
+      const topic = this.layout?.mqttTopic || 'marker/predict';
+      this._mqttClient.publish(topic, JSON.stringify(payload), { qos: 0 });
   }
 
   /**

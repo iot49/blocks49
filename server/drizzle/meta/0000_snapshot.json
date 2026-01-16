@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "5102a9f1-bbff-48da-b5fe-9e5bd2d6a506",
+  "id": "18aea5b1-8601-477f-9cbe-642be13d2ee9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "images": {
@@ -21,15 +21,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "filename": {
-          "name": "filename",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "labels": {
-          "name": "labels",
+        "markers": {
+          "name": "markers",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -93,6 +86,21 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "classifier": {
+          "name": "classifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "mqtt_topic": {
+          "name": "mqtt_topic",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'marker/predict'"
         },
         "p1_x": {
           "name": "p1_x",
@@ -196,6 +204,36 @@
           "notNull": false,
           "autoincrement": false,
           "default": "'user'"
+        },
+        "profile": {
+          "name": "profile",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "mqtt_broker": {
+          "name": "mqtt_broker",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'ws://localhost:8083'"
+        },
+        "active": {
+          "name": "active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": true
+        },
+        "login_at": {
+          "name": "login_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "created_at": {
           "name": "created_at",
