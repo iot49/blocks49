@@ -1,12 +1,14 @@
 import json
+import os
 from pathlib import Path
 
 # Constants moved from learner.py
-# should be environment variable or something ...
-R49DIR = Path("/Users/boser/Documents/personal/iot/rails49")
+R49DIR = Path(os.getenv("RAILS49DIR", "/Users/boser/Documents/personal/iot/rails49"))
 
 MODELS_DIR = R49DIR / "models"
-DATA_DIR = R49DIR / "datasets/train-track/r49"
+DATA_DIR = Path(
+    os.getenv("RAILS49DATA", str(R49DIR / "local/datasets/train-track/r49"))
+)
 
 VALID_PCT = 0.25
 
