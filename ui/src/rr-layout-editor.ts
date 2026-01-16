@@ -16,8 +16,6 @@ import { layoutClient, type ApiLayout } from './api/client.js';
  * - A sidebar with file tools (Open/Save) and labeling tools (Track, Train, etc.).
  * - An image carousel (thumbnail bar) for navigating between captured images.
  * - The main layout view (rendered via `rr-marker`).
- * 
- * It also handles the initial loading of the demo project if no images are present.
  */
 @customElement('rr-layout-editor')
 export class RrLayoutEditor extends LitElement {
@@ -125,26 +123,12 @@ export class RrLayoutEditor extends LitElement {
       await this._fetchLayouts();
 
       // 2. Priority Logic:
-      // a. Is there a layout named "demo"?
-      const demoLayout = this._layouts.find(l => l.name === 'demo');
-      if (demoLayout) {
-          this._selectLayout(demoLayout.id);
-          return;
-      }
-
-      // b. Are there any other layouts?
+      // Are there any layouts?
       if (this._layouts.length > 0) {
           const firstLayout = this._layouts[0];
           this._selectLayout(firstLayout.id);
           return;
       }
-
-      // c. Backend is empty, load demo.r49
-      const response = await fetch('demo.r49');
-      if (!response.ok) return;
-      const blob = await response.blob();
-      const file = new File([blob], 'demo.r49', { type: 'application/zip' });
-      await this._load_r49(file);
     } catch (e) {
       console.warn('Failed to initialize layout', e);
     }
@@ -317,11 +301,6 @@ export class RrLayoutEditor extends LitElement {
   private async _load_r49(file: File) {
     try {
       await this.layout.load(file);
-
-      // Ensure the auto-loaded demo is named "demo" as per requirement
-      if (file.name === 'demo.r49') {
-          this.layout.setName('demo');
-      }
 
       // Check for existing layout with same name
       const existing = this._layouts.find(l => l.name === this.layout.name);

@@ -25,7 +25,7 @@ export class RrMain extends LitElement {
 
   @provide({ context: userContext })
   @state()
-  private _user: ApiUser | undefined;
+  _user: ApiUser | undefined;
 
   /* 
      State Management:

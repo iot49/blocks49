@@ -1,10 +1,15 @@
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
+import { eq } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
+import { getDb } from '../db/index.js';
+import { users } from '../db/schema.js';
 
 // Define the User identity interface available in Context
 export interface AuthUser {
+  id: string;
   email: string;
-  role: 'admin' | 'user';
+  roles: string[];
 }
 
 // Extend Hono Variable definitions
@@ -16,39 +21,68 @@ type Env = {
 
 export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   const env = process.env.NODE_ENV || 'development';
-  console.log(`[Auth] Env: ${env}, Path: ${c.req.path}`);
+  const host = c.req.header('host') || '';
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1') || host.includes('0.0.0.0') || env === 'test' || env === 'development';
+  
+  // 1. Identity Extraction
+  let email: string | undefined;
+  let rolesOverride: string[] | undefined;
 
-  // 1. Local / Offline Mode
-  // If explicitly in 'local' mode (Docker/Dev), bypass auth and act as Admin
-  if (env === 'local' || env === 'test') {
+  // Cloudflare Access Header (Primary Production Signal)
+  const cfEmail = c.req.header('cf-access-authenticated-user-email');
+
+  if (cfEmail) {
+    // Cloudflare Mode: Trust only the header. Ignore all params.
+    email = cfEmail;
+  } else if (isLocal) {
+    // Local Mode: Allow developer overrides
+    email = c.req.query('user') || 'admin@local';
+    const rolesParam = c.req.query('roles');
+    if (rolesParam) {
+      rolesOverride = rolesParam.split(',').map(r => r.trim());
+    }
+  }
+
+  // 2. Database Sync / Fetch
+  if (email) {
+    const db = getDb();
+    let userRecord = await db.select().from(users).where(eq(users.email, email)).get();
+
+    if (!userRecord) {
+      // Auto-provision user on first visit
+      const newId = randomUUID();
+      const adminEmail = process.env.ADMIN_EMAIL;
+      const isAdmin = (adminEmail && email === adminEmail) || email === 'admin@local';
+      
+      userRecord = await db.insert(users).values({
+        id: newId,
+        email: email,
+        role: isAdmin ? 'admin,user' : 'user',
+        active: true,
+      }).returning().get();
+      console.log(`[Auth] Created new user: ${email} (${userRecord.id}) [Role: ${userRecord.role}]`);
+    }
+
+    // Status Check
+    if (!userRecord.active) {
+      throw new HTTPException(403, { message: 'Account deactivated' });
+    }
+
+    // Update last login
+    await db.update(users).set({ loginAt: new Date() }).where(eq(users.id, userRecord.id));
+
+    // 3. Set Context
+    // Priority: Query param (Local only) > Database
+    const finalRoles = rolesOverride || (userRecord.role || 'user').split(',').map(r => r.trim());
+
     c.set('user', {
-      email: 'admin@local',
-      role: 'admin',
+      id: userRecord.id,
+      email: userRecord.email,
+      roles: finalRoles,
     });
-    await next();
-    return;
   }
 
-  // 2. Production (Cloudflare Access)
-  // Look for the specific header
-  const jwt = c.req.header('CF-Access-Jwt-Assertion');
-  
-  if (!jwt) {
-    // For now, if no header in non-local, return 401. 
-    // In real deployment, Cloudflare Gateway intercepts this before we see it, 
-    // but good to have a check.
-    throw new HTTPException(401, { message: 'Unauthorized: Missing Auth Header' });
-  }
-
-  // TODO: Verify JWT signature using Cloudflare certs (jwks)
-  // For this scaffold, we purely decode the email from the token or look for another header
-  // Cloudflare also sends 'Cf-Access-Authenticated-User-Email' if configured.
-  const email = c.req.header('cf-access-authenticated-user-email') || 'unknown@user';
-  
-  c.set('user', {
-    email,
-    role: 'user', // Default to user, real implementation might query DB for role
-  });
-
+  // Lenient Auth: We proceed even if no user found. 
+  // RBAC middleware will decide if the route is public or blocked.
   await next();
 });

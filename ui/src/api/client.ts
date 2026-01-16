@@ -55,7 +55,7 @@ const API_BASE = '/api';
 export class LayoutClient {
 
     async listLayouts(): Promise<ApiLayout[]> {
-        const res = await fetch(`${API_BASE}/layouts`);
+        const res = await fetch(`${API_BASE}/user/layouts`);
         if (!res.ok) throw new Error(`Failed to fetch layouts: ${res.statusText} (${res.status})`);
         const data = await res.json();
         return data.layouts;
@@ -80,14 +80,14 @@ export class LayoutClient {
     }
 
     async getLayout(id: string): Promise<ApiLayout> {
-        const res = await fetch(`${API_BASE}/layouts/${id}`);
+        const res = await fetch(`${API_BASE}/user/layouts/${id}`);
         if (!res.ok) throw new Error(`Failed to fetch layout: ${res.statusText} (${res.status})`);
         const data = await res.json();
         return data.layout;
     }
 
     async createLayout(name: string, scale: string): Promise<ApiLayout> {
-        const res = await fetch(`${API_BASE}/layouts`, {
+        const res = await fetch(`${API_BASE}/user/layouts`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, scale })
@@ -99,7 +99,7 @@ export class LayoutClient {
     }
 
     async updateLayout(id: string, updates: Partial<ApiLayout>): Promise<ApiLayout> {
-        const res = await fetch(`${API_BASE}/layouts/${id}`, {
+        const res = await fetch(`${API_BASE}/user/layouts/${id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(updates)
@@ -110,7 +110,7 @@ export class LayoutClient {
     }
 
     async deleteLayout(id: string): Promise<void> {
-        const res = await fetch(`${API_BASE}/layouts/${id}`, {
+        const res = await fetch(`${API_BASE}/user/layouts/${id}`, {
             method: 'DELETE'
         });
         if (!res.ok) throw new Error(`Failed to delete layout: ${res.statusText} (${res.status})`);
@@ -123,7 +123,7 @@ export class LayoutClient {
             formData.append('labels', JSON.stringify(markers));
         }
 
-        const res = await fetch(`${API_BASE}/layouts/${layoutId}/images`, {
+        const res = await fetch(`${API_BASE}/user/layouts/${layoutId}/images`, {
             method: 'POST',
             body: formData
         });

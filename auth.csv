@@ -1,0 +1,30 @@
+# <method>, <url-pattern>, <role>, <comment>
+get, /, public, main entry point
+get, /api/health, public, api health check
+get, /static/ui**, public, user interface
+get, /static/models/**, public, classifier models 
+get, /static/doc**, public, documentation
+get, /static/favicon.ico, public, favicon
+
+# Users
+get, /api/users/me, user, Get current user profile
+patch, /api/users/me, user, Update current user profile
+get, /api/users, admin, List all users (admin only)
+patch, /api/users/*, admin, Update any user (admin only)
+
+# Layouts - Admin
+get, /api/layouts, admin, List all layouts in system
+get, /api/layouts/*, admin, Get any layout details
+
+# Layouts - User (Scoped)
+get, /api/user/layouts, user, List own layouts
+post, /api/user/layouts, user, Create new layout
+get, /api/user/layouts/*, user, Get own layout details
+patch, /api/user/layouts/*, user, Update own layout
+delete, /api/user/layouts/*, user, Delete own layout
+post, /api/user/layouts/*/images, user, Upload image to own layout
+
+# Images (Shared / Scoped in handler)
+get, /api/images/*, user, Serve own image binary
+patch, /api/images/*, user, Update own image metadata
+delete, /api/images/*, user, Delete own image
