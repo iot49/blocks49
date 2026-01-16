@@ -179,8 +179,19 @@ export class Layout extends EventTarget {
         }
     }
 
-    removeImage(index: number) {
+    async removeImage(index: number) {
         if (index >= 0 && index < this._images.length) {
+            const imgMeta = this._dataInternal.images[index];
+            if (imgMeta && this.id) {
+                try {
+                    await layoutClient.deleteImage(imgMeta.id);
+                } catch (e) {
+                    console.error("Failed to delete image from backend", e);
+                    // Continue to remove locally even if backend fails? 
+                    // Better to let user know, but UI usually expects immediate removal.
+                }
+            }
+            
             this._images.splice(index, 1);
             // Also remove from _data.images if it exists to keep in sync
             if (this._dataInternal?.images && index < this._dataInternal.images.length) {

@@ -402,12 +402,12 @@ export class RrLayoutEditor extends LitElement {
   /**
    * Deletes an image from the project and handles index management for the carousel.
    */
-  private _handleDeleteImage(e: Event, index: number) {
+  private async _handleDeleteImage(e: Event, index: number) {
     e.stopPropagation(); // Prevent selecting the image when deleting
 
     // Remove image from array
     // Remove image using Layout method
-    this.layout.removeImage(index);
+    await this.layout.removeImage(index);
 
     // Request update to refresh UI
     this.requestUpdate();

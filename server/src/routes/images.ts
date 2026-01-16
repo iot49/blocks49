@@ -3,7 +3,7 @@ import { getDb } from '../db/index.js';
 import { images, layouts, users } from '../db/schema.js';
 import type { AuthUser } from '../middleware/auth.js';
 import { eq } from 'drizzle-orm';
-import { readFile } from 'fs/promises';
+import { readFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { randomUUID } from 'crypto';
 
@@ -15,8 +15,8 @@ type Env = {
 };
 
 const app = new Hono<Env>();
-const serverRoot = new URL('../../', import.meta.url).pathname;
-const STORAGE_DIR = process.env.STORAGE_DIR || join(serverRoot, 'data/images');
+const projectRoot = new URL('../../../', import.meta.url).pathname;
+const STORAGE_DIR = process.env.STORAGE_DIR || join(projectRoot, 'local/server/data/images');
 
 // Helper to resolve User UUID from Email (duplicated to avoid refactor overhead)
 async function ensureUserId(email: string): Promise<string> {
@@ -113,6 +113,46 @@ app.get('/:id', async (c) => {
         }
         return c.json({ error: 'File read error' }, 500);
     }
+});
+
+// DELETE /api/images/:id - Delete Image (Disk + DB)
+app.delete('/:id', async (c) => {
+    const id = c.req.param('id');
+    const user = c.var.user;
+    const db = getDb();
+
+    // 1. Get Image Metadata
+    const image = await db.select().from(images).where(eq(images.id, id)).get();
+    if (!image) return c.json({ error: 'Image not found' }, 404);
+
+    // 2. Auth Check (Must own layout)
+    if (user.role !== 'admin') {
+        const layout = await db.select().from(layouts).where(eq(layouts.id, image.layoutId!)).get();
+        const userId = await ensureUserId(user.email);
+        
+        if (!layout || layout.userId !== userId) {
+            return c.json({ error: 'Unauthorized' }, 403);
+        }
+    }
+
+    // 3. Delete from Disk
+    const storageKey = `${image.id}.jpg`;
+    const filePath = join(STORAGE_DIR, storageKey);
+    try {
+        await unlink(filePath);
+        console.log(`[Backend] Deleted file from disk: ${filePath}`);
+    } catch (e: any) {
+        if (e.code !== 'ENOENT') {
+            console.error(`[Backend] Failed to delete file ${filePath}:`, e);
+            // We continue even if file deletion fails (maybe it was already gone)
+        }
+    }
+
+    // 4. Delete from Database
+    await db.delete(images).where(eq(images.id, id)).run();
+    console.log(`[Backend] Deleted image record from DB: ${id}`);
+
+    return c.json({ success: true });
 });
 
 export default app;

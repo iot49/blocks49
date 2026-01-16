@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import app from '../src/app';
-import { getDb } from '../src/db/index';
-import { users } from '../src/db/schema';
+import { eq } from 'drizzle-orm';
+import app from '../../server/src/app';
+import { getDb } from '../../server/src/db/index';
+import { users, images } from '../../server/src/db/schema';
+import { existsSync } from 'fs';
+import { join } from 'path';
 
 describe('Basic API', () => {
 
@@ -79,12 +82,25 @@ describe('Basic API', () => {
         const getLayoutBody = await getLayoutRes.json();
         const apiImage = (getLayoutBody as any).layout.images.find((img: any) => img.id === imageId);
         expect(apiImage).toBeDefined();
-        expect(apiImage.labels).toEqual(labels);
+        expect(apiImage.markers).toEqual(labels);
 
         // 4. Retrieve Raw Image Content
         const getRes = await app.request(`/api/images/${imageId}`);
         expect(getRes.status).toBe(200);
         const text = await getRes.text();
         expect(text).toBe('fake-image-content');
+
+        // 5. Delete and Verify
+        const deleteRes = await app.request(`/api/images/${imageId}`, { method: 'DELETE' });
+        expect(deleteRes.status).toBe(200);
+
+        // Verify DB is empty
+        const dbImage = await getDb().select().from(images).where(eq(images.id, imageId)).get();
+        expect(dbImage).toBeUndefined();
+
+        // Verify Disk is empty
+        const storageDir = process.env.STORAGE_DIR!;
+        const filePath = join(storageDir, `${imageId}.jpg`);
+        expect(existsSync(filePath)).toBe(false);
     });
 });

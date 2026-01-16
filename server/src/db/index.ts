@@ -20,8 +20,9 @@ export function getDb(): DB {
     const __dirname = dirname(__filename);
     
     // The server root is 2 levels up from src/db/index.ts
-    const serverRoot = join(__dirname, '../../');
-    const dbPath = process.env.DB_URL || join(serverRoot, 'data.db');
+    // Local data is in <root>/local/server
+    const projectRoot = join(__dirname, '../../..');
+    const dbPath = process.env.DB_URL || join(projectRoot, 'local/server/data.db');
     
     console.log(`[DB] Database File: ${dbPath}`);
     const sqlite = new Database(dbPath);
@@ -33,7 +34,7 @@ export function getDb(): DB {
 
     // Automatically apply migrations on startup/connection
     try {
-        const migrationsFolder = join(serverRoot, 'drizzle');
+        const migrationsFolder = join(projectRoot, 'server/drizzle');
         console.log(`[DB] Applying migrations from: ${migrationsFolder}`);
         migrate(dbInstance, { migrationsFolder });
         console.log(`[DB] Migrations applied successfully.`);

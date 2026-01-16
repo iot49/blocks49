@@ -1,0 +1,5 @@
+#!/bin/bash
+# Run server tests from the root directory
+
+cd "$(dirname "$0")/../server"
+npm test

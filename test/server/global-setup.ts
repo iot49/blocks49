@@ -3,11 +3,10 @@ import { fileURLToPath } from 'url';
 import { mkdirSync, rmSync } from 'fs';
 
 export async function setup() {
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const serverRoot = join(__dirname, '../');
+  const projectRoot = join(__dirname, '../../');
   
-  const testDbPath = join(serverRoot, 'tmp/test-data.db');
-  const testStorageDir = join(serverRoot, 'tmp/test-images');
+  const testDbPath = join(projectRoot, 'local/tmp/test-data.db');
+  const testStorageDir = join(projectRoot, 'local/tmp/test-images');
 
   // Set environment variables for tests
   process.env.DB_URL = testDbPath;

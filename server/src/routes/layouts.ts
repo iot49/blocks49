@@ -20,8 +20,8 @@ type Env = {
 const app = new Hono<Env>();
 
 // Local Storage Path (Docker Volume)
-const serverRoot = new URL('../../', import.meta.url).pathname;
-const STORAGE_DIR = process.env.STORAGE_DIR || join(serverRoot, 'data/images');
+const projectRoot = new URL('../../../', import.meta.url).pathname;
+const STORAGE_DIR = process.env.STORAGE_DIR || join(projectRoot, 'local/server/data/images');
 
 // Helper to resolve User UUID from Email
 async function ensureUserId(email: string): Promise<string> {

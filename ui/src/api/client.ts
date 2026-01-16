@@ -142,6 +142,13 @@ export class LayoutClient {
         return data.image;
     }
 
+    async deleteImage(imageId: string): Promise<void> {
+        const res = await fetch(`${API_BASE}/images/${imageId}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) throw new Error(`Failed to delete image: ${res.statusText} (${res.status})`);
+    }
+
     getImageUrl(imageId: string): string {
         return `${API_BASE}/images/${imageId}`;
     }

@@ -4,7 +4,8 @@ import { mkdirSync, rmSync } from 'fs';
 
 export default defineConfig({
   test: {
-    globalSetup: './tests/global-setup.ts',
+    globalSetup: '../test/server/global-setup.ts',
     environment: 'node',
+    include: ['../test/server/**/*.test.ts'],
   },
 });

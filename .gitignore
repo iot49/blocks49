@@ -1,9 +1,12 @@
 models/
 datasets/
 label-ui/
+modellbahn/
 tmp/
 .envrc
 .env
+# Local data
+local/
 
 # Python
 __pycache__/
