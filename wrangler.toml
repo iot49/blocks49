@@ -8,7 +8,7 @@ database_name = "rails49-db"
 database_id = "PLACEHOLDER_D1_ID"
 
 [[r2_buckets]]
-binding = "ASSETS"
+binding = "IMAGES"
 bucket_name = "rails49-assets"
 
 [vars]

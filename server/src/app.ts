@@ -13,7 +13,7 @@ import path from 'path';
 // Define the environment for Hono to include our user variable
 type Bindings = {
     DB: D1Database;
-    ASSETS: R2Bucket;
+    IMAGES: R2Bucket;
     ADMIN_EMAIL?: string;
 }
 

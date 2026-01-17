@@ -50,7 +50,7 @@ export class LocalStorageService implements StorageService {
 export class R2StorageService implements StorageService {
     private bindingName: string;
 
-    constructor(bindingName: string = 'ASSETS') {
+    constructor(bindingName: string = 'IMAGES') {
         this.bindingName = bindingName;
     }
 
@@ -88,7 +88,7 @@ export class R2StorageService implements StorageService {
 let storageInstance: StorageService | undefined;
 
 export function getStorage(c: Context): StorageService {
-    if (c.env?.ASSETS) {
+    if (c.env?.IMAGES) {
         return new R2StorageService();
     }
     
