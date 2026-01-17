@@ -5,7 +5,7 @@ import { mkdirSync } from 'fs';
 const distDir = path.join(process.cwd(), 'dist');
 mkdirSync(distDir, { recursive: true });
 
-esbuild.build({
+await esbuild.build({
   entryPoints: ['src/app.ts'],
   bundle: true,
   outfile: 'dist/_worker.js',
@@ -28,4 +28,5 @@ esbuild.build({
   },
   minify: true,
   sourcemap: true,
-}).catch(() => process.exit(1));
+});
+console.log('Build complete: dist/_worker.js');
