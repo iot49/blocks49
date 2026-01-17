@@ -14,7 +14,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@hono/node-server": "^1.19.7",
     "@hono/zod-validator": "^0.7.6",
