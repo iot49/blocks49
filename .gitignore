@@ -12,6 +12,7 @@ local/
 __pycache__/
 *.py[cod]
 *.class
+*.bak
 .venv
 
 # Javascript/Node

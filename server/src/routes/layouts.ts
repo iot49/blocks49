@@ -38,14 +38,14 @@ const layoutSchema = z.object({
 export const adminRoutes = new Hono<Env>();
 
 adminRoutes.get('/', async (c) => {
-  const db = getDb();
+  const db = getDb(c);
   const results = await db.select().from(layouts).orderBy(desc(layouts.updatedAt)).all();
   return c.json({ layouts: results });
 });
 
 adminRoutes.get('/:id', async (c) => {
     const id = c.req.param('id');
-    const db = getDb();
+    const db = getDb(c);
     const layout = await db.select().from(layouts).where(eq(layouts.id, id)).get();
     if (!layout) return c.json({ error: 'Not found' }, 404);
     const layoutImages = await db.select().from(images).where(eq(images.layoutId, id)).all();
@@ -58,7 +58,7 @@ export const userRoutes = new Hono<Env>();
 
 userRoutes.get('/', async (c) => {
   const user = c.var.user;
-  const db = getDb();
+  const db = getDb(c);
   const results = await db.select()
     .from(layouts)
     .where(eq(layouts.userId, user.id))
@@ -70,7 +70,7 @@ userRoutes.get('/', async (c) => {
 userRoutes.post('/', zValidator('json', layoutSchema), async (c) => {
   const user = c.var.user;
   const body = c.req.valid('json');
-  const db = getDb();
+  const db = getDb(c);
   
   const newId = randomUUID();
   const newLayout = {
@@ -89,7 +89,7 @@ userRoutes.post('/', zValidator('json', layoutSchema), async (c) => {
 userRoutes.get('/:id', async (c) => {
     const id = c.req.param('id');
     const user = c.var.user;
-    const db = getDb();
+    const db = getDb(c);
     
     // Scoped Query
     const layout = await db.select().from(layouts)
@@ -120,7 +120,7 @@ userRoutes.patch('/:id', zValidator('json', patchLayoutSchema), async (c) => {
     const id = c.req.param('id');
     const user = c.var.user;
     const body = c.req.valid('json');
-    const db = getDb();
+    const db = getDb(c);
 
     // Verify Scoped Existence
     const layout = await db.select().from(layouts)
@@ -141,7 +141,7 @@ userRoutes.patch('/:id', zValidator('json', patchLayoutSchema), async (c) => {
 userRoutes.delete('/:id', async (c) => {
     const id = c.req.param('id');
     const user = c.var.user;
-    const db = getDb();
+    const db = getDb(c);
 
     // Verify Scoped Existence
     const layout = await db.select().from(layouts)

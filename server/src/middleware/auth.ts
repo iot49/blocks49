@@ -1,4 +1,5 @@
 import { createMiddleware } from 'hono/factory';
+import { env } from 'hono/adapter';
 import { HTTPException } from 'hono/http-exception';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
@@ -14,15 +15,20 @@ export interface AuthUser {
 
 // Extend Hono Variable definitions
 type Env = {
+  Bindings: {
+    DB: any;
+    ASSETS: any;
+    ADMIN_EMAIL?: string;
+  };
   Variables: {
     user: AuthUser;
   };
 };
 
 export const authMiddleware = createMiddleware<Env>(async (c, next) => {
-  const env = process.env.NODE_ENV || 'development';
+  const nodeEnv = process.env.NODE_ENV || 'development';
   const host = c.req.header('host') || '';
-  const isLocal = host.includes('localhost') || host.includes('127.0.0.1') || host.includes('0.0.0.0') || env === 'test' || env === 'development';
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1') || host.includes('0.0.0.0') || nodeEnv === 'test' || nodeEnv === 'development';
   
   // 1. Identity Extraction
   let email: string | undefined;
@@ -45,13 +51,14 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
 
   // 2. Database Sync / Fetch
   if (email) {
-    const db = getDb();
+    const db = getDb(c);
     let userRecord = await db.select().from(users).where(eq(users.email, email)).get();
 
     if (!userRecord) {
       // Auto-provision user on first visit
+      const { ADMIN_EMAIL } = env(c);
       const newId = randomUUID();
-      const adminEmail = process.env.ADMIN_EMAIL;
+      const adminEmail = ADMIN_EMAIL || process.env.ADMIN_EMAIL;
       const isAdmin = (adminEmail && email === adminEmail) || email === 'admin@local';
       
       userRecord = await db.insert(users).values({
@@ -73,7 +80,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
 
     // 3. Set Context
     // Priority: Query param (Local only) > Database
-    const finalRoles = rolesOverride || (userRecord.role || 'user').split(',').map(r => r.trim());
+    const finalRoles = rolesOverride || (userRecord.role || 'user').split(',').map((r: string) => r.trim());
 
     c.set('user', {
       id: userRecord.id,

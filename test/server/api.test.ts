@@ -1,12 +1,14 @@
 import { expect, test, describe, beforeAll, afterAll } from 'vitest';
 import { eq } from 'drizzle-orm';
 import app from '../../server/src/app.js';
-import { getDb } from '../../server/src/db/index.js';
+import { getDb, setNodeDb } from '../../server/src/db/index.js';
+import { getSqliteDb } from '../../server/src/db/sqlite.js';
 import { layouts, users } from '../../server/src/db/schema.js';
 
 describe('Basic API', () => {
     beforeAll(async () => {
-        // Migrations handled in app/db initialization
+        // Initialize Local DB for Test
+        setNodeDb(getSqliteDb());
     });
 
     test('GET /health returns ok', async () => {

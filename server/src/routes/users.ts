@@ -20,7 +20,7 @@ const app = new Hono<Env>();
 // GET /api/users/me - Get Current User data
 app.get('/me', async (c) => {
     const authUser = c.var.user;
-    const db = getDb();
+    const db = getDb(c);
     
     const user = await db.select().from(users).where(eq(users.id, authUser.id)).get();
     
@@ -40,7 +40,7 @@ const patchUserSchema = z.object({
 app.patch('/me', zValidator('json', patchUserSchema), async (c) => {
     const authUser = c.var.user;
     const body = c.req.valid('json');
-    const db = getDb();
+    const db = getDb(c);
 
     const updated = await db.update(users)
         .set(body)
@@ -55,7 +55,7 @@ app.patch('/me', zValidator('json', patchUserSchema), async (c) => {
 
 // GET /api/users - List all users (admin only)
 app.get('/', async (c) => {
-    const db = getDb();
+    const db = getDb(c);
     const allUsers = await db.select().from(users).all();
     return c.json({ users: allUsers });
 });
@@ -69,7 +69,7 @@ const adminPatchUserSchema = z.object({
 app.patch('/:id', zValidator('json', adminPatchUserSchema), async (c) => {
     const id = c.req.param('id');
     const body = c.req.valid('json');
-    const db = getDb();
+    const db = getDb(c);
 
     const updated = await db.update(users)
         .set(body)

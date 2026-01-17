@@ -1,9 +1,7 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { eq, and } from 'drizzle-orm';
-import { readFile, unlink } from 'fs/promises';
-import { join } from 'path';
-
 import { getDb } from '../db/index.js';
+import { getStorage } from '../services/storage.js';
 import { layouts, images } from '../db/schema.js';
 import type { AuthUser } from '../middleware/auth.js';
 
@@ -16,20 +14,15 @@ type Env = {
 
 const app = new Hono<Env>();
 
-// Local Storage Path (Docker Volume)
-const projectRoot = new URL('../../../', import.meta.url).pathname;
-const STORAGE_DIR = process.env.STORAGE_DIR || join(projectRoot, 'local/server/data/images');
-
 // Helper to scope image queries by ownership (via layout)
-async function getScopedImage(imageId: string, user: AuthUser) {
-    const db = getDb();
+async function getScopedImage(c: Context, imageId: string, user: AuthUser) {
+    const db = getDb(c);
     const isAdmin = user.roles.includes('admin');
 
     if (isAdmin) {
         return await db.select().from(images).where(eq(images.id, imageId)).get();
     }
 
-    // Join with layouts to verify ownership implicitly in the query
     const result = await db.select({
         image: images
     })
@@ -39,7 +32,7 @@ async function getScopedImage(imageId: string, user: AuthUser) {
         eq(images.id, imageId),
         eq(layouts.userId, user.id)
     ))
-    .get();
+    .get() as { image: typeof images.$inferSelect } | undefined;
 
     return result?.image;
 }
@@ -49,10 +42,10 @@ app.patch('/:id', async (c) => {
     const id = c.req.param('id');
     const user = c.var.user;
     const body = await c.req.json();
-    const db = getDb();
+    const db = getDb(c);
 
     // 1. Get Image Metadata (Scoped)
-    const image = await getScopedImage(id, user);
+    const image = await getScopedImage(c, id, user);
     if (!image) return c.json({ error: 'Image not found or unauthorized' }, 404);
 
     // 2. Perform Update
@@ -78,23 +71,15 @@ app.get('/:id', async (c) => {
     const user = c.var.user;
 
     // 1. Get Image Metadata (Scoped)
-    const image = await getScopedImage(id, user);
+    const image = await getScopedImage(c, id, user);
     if (!image) return c.json({ error: 'Image not found or unauthorized' }, 404);
 
     // 2. Serve File
-    const storageKey = `${image.id}.jpg`; 
-    
     try {
-        const buffer = await readFile(join(STORAGE_DIR, storageKey));
-        return c.body(buffer, 200, {
-            'Content-Type': 'image/jpeg',
-            'Cache-Control': 'private, max-age=86400'
-        });
+        const storage = getStorage(c);
+        return await storage.get(c, `${image.id}.jpg`);
     } catch (e: any) {
-        if (e.code === 'ENOENT') {
-            return c.json({ error: 'File not found on disk' }, 404);
-        }
-        return c.json({ error: 'File read error' }, 500);
+        return c.json({ error: 'File read error', message: e.message }, 500);
     }
 });
 
@@ -102,16 +87,16 @@ app.get('/:id', async (c) => {
 app.delete('/:id', async (c) => {
     const id = c.req.param('id');
     const user = c.var.user;
-    const db = getDb();
+    const db = getDb(c);
 
     // 1. Get Image Metadata (Scoped)
-    const image = await getScopedImage(id, user);
+    const image = await getScopedImage(c, id, user);
     if (!image) return c.json({ error: 'Image not found or unauthorized' }, 404);
 
-    // 2. Delete from Disk
-    const storageKey = `${image.id}.jpg`;
+    // 2. Delete from Storage
     try {
-        await unlink(join(STORAGE_DIR, storageKey));
+        const storage = getStorage(c);
+        await storage.delete(c, `${image.id}.jpg`);
     } catch (e: any) {
         // Log skip if doesn't exist, but don't fail
     }

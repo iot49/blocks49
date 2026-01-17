@@ -81,7 +81,7 @@ export class Classifier {
   }
 
   private async _doInitialize(modelData?: Uint8Array): Promise<void> {
-    const baseUrl = `/models/${this.model}`;
+    const baseUrl = `/public/models/${this.model}`;
     
     // 1. Load configuration
     try {

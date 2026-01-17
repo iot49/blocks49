@@ -1,11 +1,10 @@
 import { Hono } from 'hono';
 import { getDb } from '../db/index.js';
+import { getStorage } from '../services/storage.js';
 import { images, layouts, users } from '../db/schema.js';
 import type { AuthUser } from '../middleware/auth.js';
 import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import { mkdir, writeFile } from 'fs/promises';
-import { join } from 'path';
 
 // Extend Hono environment
 type Env = {
@@ -16,21 +15,12 @@ type Env = {
 
 const app = new Hono<Env>();
 
-// Local Storage Path (Docker Volume)
-const projectRoot = new URL('../../../', import.meta.url).pathname;
-const STORAGE_DIR = process.env.STORAGE_DIR || join(projectRoot, 'local/server/data/images');
-
-// Helper: Ensure storage dir exists
-async function ensureDir() {
-    await mkdir(STORAGE_DIR, { recursive: true });
-}
-
 // POST /api/user/layouts/:layoutId/images
 // Ownership is enforced by Scoped Layout Lookup
 app.post('/:layoutId/images', async (c) => {
     const layoutId = c.req.param('layoutId');
     const user = c.var.user;
-    const db = getDb();
+    const db = getDb(c);
     const isAdmin = user.roles.includes('admin');
     
     // 1. Verify Layout Scoped Existence
@@ -62,14 +52,13 @@ app.post('/:layoutId/images', async (c) => {
         }
     }
 
-    // 3. Save File Locally
-    await ensureDir();
+    // 3. Save File
     const imageId = randomUUID();
     const filename = `${imageId}.jpg`;
-    const filePath = join(STORAGE_DIR, filename); 
     
     const buffer = await file.arrayBuffer();
-    await writeFile(filePath, Buffer.from(buffer));
+    const storage = getStorage(c);
+    await storage.put(c, filename, buffer, 'image/jpeg');
 
     // 4. Save DB Record
     const newImage = {

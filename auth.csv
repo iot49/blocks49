@@ -1,10 +1,10 @@
 # <method>, <url-pattern>, <role>, <comment>
 get, /, public, main entry point
 get, /api/health, public, api health check
-get, /static/ui**, public, user interface
-get, /static/models/**, public, classifier models 
-get, /static/doc**, public, documentation
-get, /static/favicon.ico, public, favicon
+get, /public/ui**, public, user interface
+get, /public/models/**, public, classifier models 
+get, /public/doc**, public, documentation
+get, /public/favicon.ico, public, favicon
 
 # Users
 get, /api/users/me, user, Get current user profile
