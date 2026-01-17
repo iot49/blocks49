@@ -26,9 +26,14 @@ jobs:
         run: |
           cd ui && npm run build
 
+      - name: Build Server (_worker.js)
+        run: |
+          cd server && npm run build
+          cp server/dist/_worker.js ui/dist/_worker.js
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy ui/dist --project-name=rails49 --branch=${{ github.head_ref || github.ref_name }}
+          command: pages deploy ui/dist --project-name=rails49 --branch=main
