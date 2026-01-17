@@ -5,7 +5,7 @@ pages_build_output_dir = "ui/dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "rails49-db"
-database_id = "PLACEHOLDER_D1_ID"
+database_id = "41cc44eb-ccb9-49f4-968f-70a1ddff133e"
 
 [[r2_buckets]]
 binding = "IMAGES"
