@@ -1,0 +1,9 @@
+# Generated from model/s:
+# - /Users/boser/Documents/personal/iot/rails49/frontend/public/models/resnet18/model_fp32.with_runtime_opt.ort
+# - /Users/boser/Documents/personal/iot/rails49/frontend/public/models/resnet18/tmpc8se4fb5.without_runtime_opt/model_fp32.ort
+ai.onnx;1;GlobalAveragePool
+ai.onnx;11;Conv
+ai.onnx;12;MaxPool
+ai.onnx;13;Concat,MatMul
+ai.onnx;14;Add,BatchNormalization,Relu,Reshape
+com.microsoft;1;FusedConv

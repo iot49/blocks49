@@ -1,0 +1,47 @@
+{
+  "model": "fastai:resnet18",
+  "labels": [
+    "track",
+    "train",
+    "other"
+  ],
+  "size": 96,
+  "dpt": 28,
+  "batch_size": 128,
+  "normalization": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "metrics": {
+    "train_samples": 756,
+    "valid_samples": 252,
+    "error_rates": {
+      "PyTorch (FP32)": {
+        "train_err": 0.01406249962747097,
+        "valid_err": 0.003968250006437302,
+        "train_loss": 0.04729918763041496,
+        "valid_loss": 0.017655396834015846
+      },
+      "ORT (FP32)": {
+        "train_err": 0.011904761904761862,
+        "valid_err": 0.003968253968253954
+      },
+      "ORT (FP16)": {
+        "train_err": 0.011904761904761862,
+        "valid_err": 0.003968253968253954
+      },
+      "ORT (Int8)": {
+        "train_err": 0.023809523809523836,
+        "valid_err": 0.011904761904761862
+      }
+    }
+  }
+}

@@ -7,8 +7,6 @@ import layoutImageRoutes from './routes/layouts_images.js';
 import imageRoutes from './routes/images.js';
 import userRoutes from './routes/users.js';
 import { HTTPException } from 'hono/http-exception';
-import { serveStatic } from '@hono/node-server/serve-static';
-import path from 'path';
 
 // Define the environment for Hono to include our user variable
 type Bindings = {
@@ -29,18 +27,35 @@ app.get('/health', (c) => {
   return c.json({ status: 'ok', env: process.env.NODE_ENV || 'development' });
 });
 
-// Serve public static assets
-// In production (Cloudflare), these might be served by Pages directly,
-// but we need them here for local dev and consistency.
-app.use('/public/models/*', serveStatic({ 
-    root: './',
-    rewriteRequestPath: (p) => p.replace(/^\/public/, '') 
-}));
-app.use('/public/favicon.ico', serveStatic({ path: './ui/public/favicon.ico' }));
+app.get('/api/health', (c) => {
+  return c.json({ status: 'ok', env: process.env.NODE_ENV || 'development' });
+});
 
-// Protect API routes
-app.use('*', authMiddleware);
-app.use('*', rbacMiddleware);
+app.get('/api/debug', (c) => {
+  const headers: Record<string, string> = {};
+  for (const [key, value] of c.req.raw.headers.entries()) {
+      headers[key] = value;
+  }
+  return c.json({ headers });
+});
+
+// Serve public static assets
+import { getStorage } from './services/storage.js';
+
+app.get('/public/*', async (c) => {
+    const path = c.req.path.replace(/^\/public\//, '');
+    console.log(`[Storage] Fetching asset: ${path}`);
+    const storage = getStorage(c);
+    const res = await storage.get(c, path);
+    
+    // Add caching headers for assets
+    res.headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    return res;
+});
+
+// Protect API routes only
+app.use('/api/*', authMiddleware);
+app.use('/api/*', rbacMiddleware);
 
 // Mount sub-apps
 app.route('/api/layouts', adminLayoutRoutes); 
@@ -48,6 +63,15 @@ app.route('/api/user/layouts', userLayoutRoutes);
 app.route('/api/user/layouts', layoutImageRoutes); 
 app.route('/api/images', imageRoutes); 
 app.route('/api/users', userRoutes); 
+
+// Serve static assets from Cloudflare Pages as fallback
+app.get('*', async (c) => {
+    // Check if we are in Cloudflare env with ASSETS fetcher
+    if ((c.env as any).ASSETS) {
+        return await (c.env as any).ASSETS.fetch(c.req.raw);
+    }
+    return c.notFound();
+});
 
 // Global Error Handler
 app.onError((err, c) => {

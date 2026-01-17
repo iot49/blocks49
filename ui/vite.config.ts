@@ -13,10 +13,14 @@ export default defineConfig({
       ],
     }),
   ],
-  base: '/public/ui/',
+  base: '/',
   server: {
     proxy: {
       '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/public/models': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       }

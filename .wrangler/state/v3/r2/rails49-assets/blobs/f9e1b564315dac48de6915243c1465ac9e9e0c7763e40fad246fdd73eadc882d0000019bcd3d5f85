@@ -1,0 +1,15 @@
+# TODO: move to models endpoint
+
+# resnet18 Exported Model
+
+| Model | Error Rate | Size (MB) |
+| --- | --- | --- |
+| ORT (FP16) | 0.40% | 22.41 |
+| ORT (FP32) | 0.40% | 44.69 |
+| ORT (Int8) | 1.19% | 11.30 |
+| PyTorch (FP32) | 0.40% | 44.75 |
+
+**Dataset Info:**
+- Training Samples: 756
+- Validation Samples: 252
+- Labels: track, train, other

@@ -36,11 +36,26 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
 
   // Cloudflare Access Header (Primary Production Signal)
   const cfEmail = c.req.header('cf-access-authenticated-user-email');
+  const cfJwt = c.req.header('cf-access-jwt-assertion');
 
   if (cfEmail) {
     // Cloudflare Mode: Trust only the header. Ignore all params.
     email = cfEmail;
-  } else if (isLocal) {
+  } else if (cfJwt) {
+    // Fallback: Decode the JWT assertion if the simple email header is missing
+    try {
+      const parts = cfJwt.split('.');
+      if (parts.length === 3) {
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+        email = payload.email;
+        if (email) console.log(`[Auth] Extracted identity from JWT: ${email}`);
+      }
+    } catch (e) {
+      console.warn("[Auth] Failed to decode cf-access-jwt-assertion");
+    }
+  }
+
+  if (!email && isLocal) {
     // Local Mode: Allow developer overrides
     email = c.req.query('user') || 'admin@local';
     const rolesParam = c.req.query('roles');

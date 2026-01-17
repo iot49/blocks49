@@ -1,4 +1,6 @@
 import type { Context } from 'hono';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 export interface StorageService {
     get(c: Context, key: string): Promise<Response>;
@@ -94,8 +96,9 @@ export function getStorage(c: Context): StorageService {
     
     // In Node, we lazily initialize the local storage
     if (!storageInstance) {
-        const projectRoot = new URL('../../../', import.meta.url).pathname;
-        const storageDir = process.env.STORAGE_DIR || (projectRoot + 'local/server/data/images');
+        // Use an absolute path resolved from the project root to avoid CWD confusion
+        const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '../../../'); 
+        let storageDir = process.env.STORAGE_DIR || join(projectRoot, 'local/server/data/images');
         storageInstance = new LocalStorageService(storageDir);
     }
     return storageInstance;

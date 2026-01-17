@@ -103,16 +103,29 @@ export class RrMain extends LitElement {
   private async _loadLayout(layoutId: string) {
     try {
       await this._layout.loadFromApi(layoutId);
-    } catch (err) {
-      console.error("Failed to sync layout:", err);
+    } catch (err: any) {
+      console.warn("Failed to sync layout:", err);
+      if (err.message && err.message.includes('404')) {
+          console.log("Layout not found, clearing active session.");
+          localStorage.removeItem('rr-active-layout-id');
+          // Optional: Reset layout to default state if needed, though constructor handles defaults.
+      }
     }
   }
 
   private async _loadUser() {
     try {
+        // Debug headers first to see what Cloudflare is sending
+        const debugRes = await fetch('/api/debug');
+        const debugData = await debugRes.json();
+        const cfEmail = debugData.headers['cf-access-authenticated-user-email'];
+        console.log(`[Auth Debug] Headers received. Identity header: ${cfEmail || 'MISSING'}`);
+        
         this._user = await layoutClient.me();
-    } catch (e) {
-        console.error("Failed to load user info", e);
+        console.log(`[Auth] Logged in as: ${this._user.email}`);
+    } catch (e: any) {
+        console.warn(`[Auth] Not logged in (Anonymous). Status: ${e.status || 'unknown'}`);
+        this._user = undefined;
     }
   }
 
@@ -122,6 +135,18 @@ export class RrMain extends LitElement {
       flex-direction: column;
       height: 100vh;
       font-family: sans-serif;
+    }
+    .user-info {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 9999;
+      pointer-events: none;
     }
   `;
 
@@ -154,6 +179,7 @@ export class RrMain extends LitElement {
             ? html`<rr-live-view></rr-live-view>`
             : html`<rr-layout-editor></rr-layout-editor>`
         }
+        ${this._user ? html`<div class="user-info">${this._user.email}</div>` : ''}
     `;
   }
 }

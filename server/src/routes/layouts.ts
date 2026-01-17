@@ -3,14 +3,11 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { eq, desc, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import { unlink } from 'fs/promises';
-import { join } from 'path';
-
 import { getDb } from '../db/index.js';
 import { layouts, images, users } from '../db/schema.js';
 import type { AuthUser } from '../middleware/auth.js';
+import { getStorage } from '../services/storage.js';
 
-// Extend Hono environment to include AuthUser
 type Env = {
   Variables: {
     user: AuthUser;
@@ -18,10 +15,6 @@ type Env = {
 };
 
 const app = new Hono<Env>();
-
-// Local Storage Path (Docker Volume)
-const projectRoot = new URL('../../../', import.meta.url).pathname;
-const STORAGE_DIR = process.env.STORAGE_DIR || join(projectRoot, 'local/server/data/images');
 
 // Schema for Creating/Updating Layouts
 const layoutSchema = z.object({
@@ -150,9 +143,9 @@ userRoutes.delete('/:id', async (c) => {
     if (!layout) return c.json({ error: 'Not found' }, 404);
 
     const layoutImages = await db.select().from(images).where(eq(images.layoutId, id)).all();
+    const storage = getStorage(c);
     for (const image of layoutImages) {
-        const filePath = join(STORAGE_DIR, `${image.id}.jpg`);
-        try { await unlink(filePath); } catch (e) {}
+        try { await storage.delete(c, `${image.id}.jpg`); } catch (e) {}
     }
 
     await db.delete(images).where(eq(images.layoutId, id)).run();

@@ -26,6 +26,8 @@ export class Layout extends EventTarget {
     private _layoutCommitTimer: ReturnType<typeof setTimeout> | null = null;
     private _markersCommitTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
 
+    private _persisted: boolean = false;
+
     constructor(data?: Partial<ApiLayout> | Layout) {
         super();
         if (data instanceof Layout) {
@@ -33,8 +35,10 @@ export class Layout extends EventTarget {
             this._images = [...data._images];
             this._layoutCommitTimer = data._layoutCommitTimer;
             this._markersCommitTimers = new Map(data._markersCommitTimers);
+            this._persisted = data._persisted;
         } else if (data) {
             this._dataInternal = { ...this._dataInternal, ...data };
+            // If data is provided, we default to not persisted unless explicitly known (handled by consumers or loadFromApi)
         }
     }
 
@@ -204,7 +208,10 @@ export class Layout extends EventTarget {
     async addImage(image: LayoutImage) {
         // If we have a layout ID (persistent), upload it immediately
         let backendMeta = null;
-        if (this.id) {
+        
+        await this._ensurePersisted();
+
+        if (this._persisted) {
             try {
                 const blob = await image.ensureBlob();
                 const file = new File([blob], image.name, { type: blob.type });
@@ -316,6 +323,9 @@ export class Layout extends EventTarget {
             });
             
             this._images = await Promise.all(imgPromises);
+            
+            // Loaded from file -> Not yet persisted on this backend
+            this._persisted = false; // Reset persistence flag
             this._emitChange();
             
          } catch (e) {
@@ -328,6 +338,7 @@ export class Layout extends EventTarget {
         try {
             const layout = await layoutClient.getLayout(layoutId);
             this._dataInternal = layout;
+            this._persisted = true;
             
             // Reconstruct Images
             this._images = layout.images.map(img => {
@@ -416,7 +427,9 @@ export class Layout extends EventTarget {
             }
 
             // 4. Reload from API (Sync)
+            // 4. Reload from API (Sync)
             await this.loadFromApi(layout.id);
+            this._persisted = true;
             
             return layout.id;
         } catch (e) {
@@ -448,6 +461,9 @@ export class Layout extends EventTarget {
 
     private async _commitLayout() {
         try {
+            await this._ensurePersisted();
+            if (!this._persisted) return; // Creation failed
+
             // Only send editable fields. System fields (id, userId, etc.) can cause 400 Bad Request.
             const { name, description, classifier, mqttTopic, scale, referenceDistanceMm, p1x, p1y, p2x, p2y } = this._dataInternal;
             await layoutClient.updateLayout(this.id, { 
@@ -465,6 +481,40 @@ export class Layout extends EventTarget {
             this._layoutCommitTimer = null;
         } catch (e) {
             console.error("Failed to commit layout metadata", e);
+        }
+    }
+
+    private async _ensurePersisted() {
+        if (this._persisted) return;
+
+        try {
+            console.log("Auto-creating new layout...");
+            const { name, scale } = this._dataInternal;
+            // Create via API
+            const newLayout = await layoutClient.createLayout(name, scale);
+            
+            // Adopt the real ID and timestamps from server
+            this._dataInternal = {
+                ...this._dataInternal, // Keep local edits (like description)
+                id: newLayout.id,
+                userId: newLayout.userId,
+                createdAt: newLayout.createdAt,
+                updatedAt: newLayout.updatedAt,
+                // Do NOT overwrite other fields like description if they differ, as createLayout only took name/scale
+            };
+            this._persisted = true;
+            
+            // Notify listeners that ID changed (important for URL routing or local storage)
+            this.dispatchEvent(new CustomEvent('layout-selected', { 
+                detail: { layoutId: newLayout.id },
+                bubbles: true, 
+                composed: true 
+            }));
+            
+            console.log(`Layout created with ID: ${newLayout.id}`);
+        } catch (e) {
+            console.error("Failed to ensure layout persistence", e);
+            throw e;
         }
     }
 

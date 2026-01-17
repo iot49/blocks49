@@ -1,0 +1,45 @@
+#!/bin/bash
+set -e
+
+# Navigate to project root
+cd "$(dirname "$0")/.."
+
+echo "Building UI..."
+cd ui
+npm run build
+cd ..
+
+echo "Building Server..."
+cd server
+npm run build
+cd ..
+
+cp server/dist/_worker.js ui/dist/_worker.js
+
+echo "Uploading Models to R2..."
+# Upload all files in local/server/data/images/models to R2 under models/ prefix
+# We strip the local prefix to get the key. 
+# Example: local/server/data/images/models/resnet18/model.config -> models/resnet18/model.config
+if [ -d "local/server/data/images/models" ]; then
+    find local/server/data/images/models -type f | while read file; do
+        key=${file#local/server/data/images/}
+        
+        # Check if file already exists on the production site to avoid redundant uploads
+        # We use the deployed URL for the check.
+        # Key: models/resnet18/model.config -> URL: https://rails49.org/public/models/resnet18/model.config
+        
+        # Note: We rely on the file name being unique. If you change content without changing name, 
+        # you must manually delete the object in R2 or disable this check.
+        if curl --output /dev/null --silent --head --fail "https://rails49.org/public/$key"; then
+            echo "Skipping existing $key..."
+        else
+            echo "Uploading $key..."
+            npx wrangler r2 object put rails49-assets/$key --file "$file" > /dev/null
+        fi
+    done
+else
+    echo "No models found in local/server/data/images/models to upload."
+fi
+
+echo "Deploying to Cloudflare..."
+npx wrangler pages deploy ui/dist --project-name rails49

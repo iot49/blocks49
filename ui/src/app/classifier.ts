@@ -1,7 +1,8 @@
 import * as ort from "onnxruntime-web";
 import { createContext } from "@lit/context";
 
-// Configure WASM paths to use the CDN to avoid local serving issues with MIME types
+// Use jsDelivr CDN for WASM files to ensure they work in both local and production (Pages) environments
+// without needing to bundle them or manually upload to R2.
 ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.2/dist/';
 
 import type { Point } from '../api/layout';
@@ -114,15 +115,11 @@ export class Classifier {
         }
 
         const options: any = {
-            // Enable hardware acceleration (WebNN for NPUs, WebGPU for GPUs)
-            // with automatic fallback to WASM if unsupported.
-            executionProviders: ['webnn', 'webgpu', 'wasm'],
+            // Prioritize WASM for stability. Current WebGPU (JSEP) implementation has issues 
+            // with specific quantized operators (like Cast) in this model.
+            executionProviders: ['wasm'],
             graphOptimizationLevel: 'all'
         };
-
-        if (typeof navigator !== 'undefined' && !(navigator as any).gpu) {
-            console.warn("[Classifier] WebGPU is NOT detected in this environment (navigator.gpu is missing).");
-        }
 
         this._session = await ort.InferenceSession.create(input, options);
     } catch (e) {

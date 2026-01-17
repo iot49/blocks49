@@ -1,42 +1,15 @@
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
-import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
 import type { AuthUser } from './auth.js';
-
-interface RbacRule {
-    method: string;
-    pattern: string;
-    role: string;
-}
-
-let rules: RbacRule[] = [];
+import { rules } from './rules.js';
 
 /**
  * EXPLANATION:
- * This middleware matches the current request against rules defined in `auth.csv`.
+ * This middleware matches the current request against rules defined in `rules.ts`.
  * It is the ONLY place where route-pattern matching occurs to determine required roles.
  * Ownership enforcement is NOT handled here; it is delegated to the database query logic
  * in the route handlers themselves (Scoped Queries).
  */
-
-function loadRules() {
-    const csvPath = join(process.cwd(), '../auth.csv');
-    if (!existsSync(csvPath)) {
-        console.warn(`[RBAC] auth.csv not found at ${csvPath}. Defaulting to deny-all.`);
-        return;
-    }
-
-    const content = readFileSync(csvPath, 'utf8');
-    rules = content.split('\n')
-        .map(line => line.trim())
-        .filter(line => line && !line.startsWith('#'))
-        .map(line => {
-            const [method, pattern, role] = line.split(',').map(s => s.trim().toLowerCase());
-            return { method, pattern, role };
-        });
-    console.log(`[RBAC] Loaded ${rules.length} rules from auth.csv`);
-}
 
 function patternToRegex(pattern: string): RegExp {
     // 1. Escape all regex special characters EXCEPT *
@@ -53,7 +26,6 @@ function patternToRegex(pattern: string): RegExp {
 }
 
 export const rbacMiddleware = createMiddleware<{ Variables: { user: AuthUser } }>(async (c, next) => {
-    if (rules.length === 0) loadRules();
 
     const path = c.req.path.toLowerCase();
     const method = c.req.method.toLowerCase();
@@ -70,7 +42,7 @@ export const rbacMiddleware = createMiddleware<{ Variables: { user: AuthUser } }
 
     if (!rule) {
         console.warn(`[RBAC] No rule found for ${method} ${path}. User roles: ${userRoles.join(',')}. Denying.`);
-        throw new HTTPException(403, { message: 'Forbidden: No access rule defined' });
+        throw new HTTPException(403, { message: `Forbidden: No access rule defined for ${method} ${path}` });
     }
 
     const requiredRole = rule.role;
