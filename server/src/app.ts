@@ -3,8 +3,8 @@ import { logger } from 'hono/logger';
 import { authMiddleware, type AuthUser } from './middleware/auth.js';
 import { rbacMiddleware } from './middleware/rbac.js';
 import { adminRoutes as adminLayoutRoutes, userRoutes as userLayoutRoutes } from './routes/layouts.js';
-import layoutImageRoutes from './routes/layouts_images.js';
-import imageRoutes from './routes/images.js';
+import { adminUploadRoutes, userUploadRoutes } from './routes/layouts_images.js';
+import { adminImageRoutes, userImageRoutes } from './routes/images.js';
 import userRoutes from './routes/users.js';
 import { HTTPException } from 'hono/http-exception';
 
@@ -59,9 +59,14 @@ app.use('/api/*', rbacMiddleware);
 
 // Mount sub-apps
 app.route('/api/layouts', adminLayoutRoutes); 
+app.route('/api/layouts', adminUploadRoutes); 
+
 app.route('/api/user/layouts', userLayoutRoutes); 
-app.route('/api/user/layouts', layoutImageRoutes); 
-app.route('/api/images', imageRoutes); 
+app.route('/api/user/layouts', userUploadRoutes); 
+
+app.route('/api/images', userImageRoutes); 
+app.route('/api/admin/images', adminImageRoutes); 
+
 app.route('/api/users', userRoutes); 
 
 // Serve static assets from Cloudflare Pages as fallback

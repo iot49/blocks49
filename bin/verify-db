@@ -1,0 +1,3 @@
+#!/bin/bash
+# Wrapper to run database verification from the project root
+npm run db:verify --prefix server

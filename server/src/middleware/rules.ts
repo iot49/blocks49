@@ -18,6 +18,7 @@ export const rules: RbacRule[] = [
     { method: "patch", pattern: "/api/users/*", role: "admin" },
     { method: "get", pattern: "/api/layouts", role: "admin" },
     { method: "get", pattern: "/api/layouts/*", role: "admin" },
+    { method: "post", pattern: "/api/layouts/*/images", role: "admin" },
     { method: "get", pattern: "/api/user/layouts", role: "user" },
     { method: "post", pattern: "/api/user/layouts", role: "user" },
     { method: "get", pattern: "/api/user/layouts/*", role: "user" },
@@ -26,5 +27,7 @@ export const rules: RbacRule[] = [
     { method: "post", pattern: "/api/user/layouts/*/images", role: "user" },
     { method: "get", pattern: "/api/images/*", role: "user" },
     { method: "patch", pattern: "/api/images/*", role: "user" },
-    { method: "delete", pattern: "/api/images/*", role: "user" }
+    { method: "delete", pattern: "/api/images/*", role: "user" },
+    { method: "get", pattern: "/api/admin/images/*", role: "admin" },
+    { method: "patch", pattern: "/api/admin/images/*/training", role: "admin" }
 ];

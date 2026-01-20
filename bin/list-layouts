@@ -1,0 +1,3 @@
+#!/bin/bash
+# Wrapper to list layouts from the database
+cd server && npx tsx scripts/list-layouts.ts

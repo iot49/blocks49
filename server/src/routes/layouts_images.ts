@@ -1,46 +1,26 @@
 import { Hono } from 'hono';
 import { getDb } from '../db/index.js';
 import { getStorage } from '../services/storage.js';
-import { images, layouts, users } from '../db/schema.js';
+import { images, layouts } from '../db/schema.js';
 import type { AuthUser } from '../middleware/auth.js';
 import { eq, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 
-// Extend Hono environment
 type Env = {
   Variables: {
     user: AuthUser;
   };
 };
 
-const app = new Hono<Env>();
-
-// POST /api/user/layouts/:layoutId/images
-// Ownership is enforced by Scoped Layout Lookup
-app.post('/:layoutId/images', async (c) => {
-    const layoutId = c.req.param('layoutId');
-    const user = c.var.user;
+// Common upload logic
+async function performUpload(c: any, layoutId: string, useForTraining: boolean = false) {
     const db = getDb(c);
-    const isAdmin = user.roles.includes('admin');
-    
-    // 1. Verify Layout Scoped Existence
-    const filters = [eq(layouts.id, layoutId)];
-    
-    // Scoping for non-admins
-    if (!isAdmin) {
-        filters.push(eq(layouts.userId, user.id));
-    }
-
-    const layout = await db.select().from(layouts).where(and(...filters)).get();
-    if (!layout) return c.json({ error: 'Layout not found or unauthorized' }, 404);
-
-    // 2. Parse Body (Multipart)
     const body = await c.req.parseBody();
     const file = body['file'];
     const markersRaw = body['markers'] || body['labels'];
 
     if (!file || !(file instanceof File)) {
-        return c.json({ error: 'No file uploaded' }, 400);
+        throw new Error('No file uploaded');
     }
 
     let markersJson = null;
@@ -52,24 +32,64 @@ app.post('/:layoutId/images', async (c) => {
         }
     }
 
-    // 3. Save File
     const imageId = randomUUID();
     const filename = `${imageId}.jpg`;
-    
     const buffer = await file.arrayBuffer();
     const storage = getStorage(c);
     await storage.put(c, filename, buffer, 'image/jpeg');
 
-    // 4. Save DB Record
     const newImage = {
         id: imageId,
-        layoutId: layout.id,
+        layoutId: layoutId,
         markers: markersJson,
+        useForTraining: useForTraining,
         createdAt: new Date()
     };
     await db.insert(images).values(newImage);
+    return newImage;
+}
 
-    return c.json({ image: newImage }, 201);
+// --- USER UPLOAD ROUTES (Scoped) ---
+export const userUploadRoutes = new Hono<Env>();
+
+userUploadRoutes.post('/:layoutId/images', async (c) => {
+    const layoutId = c.req.param('layoutId');
+    const user = c.var.user;
+    const db = getDb(c);
+
+    // Verify Ownership
+    const layout = await db.select().from(layouts)
+        .where(and(eq(layouts.id, layoutId), eq(layouts.userId, user.id)))
+        .get();
+        
+    if (!layout) return c.json({ error: 'Layout not found or unauthorized' }, 404);
+
+    try {
+        const newImage = await performUpload(c, layoutId, false); // Users cannot set training flag
+        return c.json({ image: newImage }, 201);
+    } catch (e: any) {
+        return c.json({ error: e.message }, 400);
+    }
 });
 
-export default app;
+// --- ADMIN UPLOAD ROUTES (Direct) ---
+export const adminUploadRoutes = new Hono<Env>();
+
+adminUploadRoutes.post('/:layoutId/images', async (c) => {
+    const layoutId = c.req.param('layoutId');
+    const db = getDb(c);
+
+    // Direct check (no userId filter)
+    const layout = await db.select().from(layouts).where(eq(layouts.id, layoutId)).get();
+    if (!layout) return c.json({ error: 'Layout not found' }, 404);
+
+    const body = await c.req.parseBody();
+    const useForTraining = body['useForTraining'] === 'true' || body['use_for_training'] === 'true';
+
+    try {
+        const newImage = await performUpload(c, layoutId, useForTraining);
+        return c.json({ image: newImage }, 201);
+    } catch (e: any) {
+        return c.json({ error: e.message }, 400);
+    }
+});

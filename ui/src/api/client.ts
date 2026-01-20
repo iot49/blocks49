@@ -38,6 +38,7 @@ export interface ApiImage {
     id: UUID;
     layoutId: UUID;
     markers?: Record<string, ApiMarker>;
+    useForTraining: boolean;
     createdAt: string;
 }
 

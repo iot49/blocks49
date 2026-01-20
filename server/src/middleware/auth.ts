@@ -74,15 +74,15 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
       const { ADMIN_EMAIL } = env(c);
       const newId = randomUUID();
       const adminEmail = ADMIN_EMAIL || process.env.ADMIN_EMAIL;
-      const isAdmin = (adminEmail && email === adminEmail) || email === 'admin@local';
+      const assignedRole = ((adminEmail && email === adminEmail) || email === 'admin@local') ? 'admin,user' : 'user';
       
       userRecord = await db.insert(users).values({
         id: newId,
         email: email,
-        role: isAdmin ? 'admin,user' : 'user',
+        role: assignedRole,
         active: true,
       }).returning().get();
-      console.log(`[Auth] Created new user: ${email} (${userRecord.id}) [Role: ${userRecord.role}]`);
+      console.log(`[Auth] Created new user: ${email} (${userRecord.id}) [Role: ${assignedRole}]`);
     }
 
     // Status Check

@@ -29,9 +29,10 @@ export class RrMain extends LitElement {
 
   /* 
      State Management:
-     We hold a stable `_layout` instance and provide it via Context.
-     Consumers (rr-layout-editor, etc.) must listen to 'rr-layout-changed' events 
-     on this instance to trigger their own updates.
+     We replace the `_layout` instance whenever deep properties change to trigger 
+     Lit's reactivity and propagate the new state to all consumers via Context.
+     This ensures consuming components re-render automatically without needing 
+     their own event listeners.
   */
 
   /** The active classifier instance. Provided to all child elements. */
