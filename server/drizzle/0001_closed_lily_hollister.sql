@@ -1,0 +1,1 @@
+ALTER TABLE `images` ADD `use_for_training` integer DEFAULT false;
