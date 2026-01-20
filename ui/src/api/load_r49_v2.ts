@@ -98,6 +98,7 @@ export async function load_r49_v2(file: File): Promise<Layout> {
                 id: crypto.randomUUID(),
                 layoutId: "", // Set later
                 markers: markers,
+                useForTraining: false,
                 createdAt: new Date().toISOString()
             });
         }

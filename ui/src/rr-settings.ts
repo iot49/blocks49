@@ -1,6 +1,6 @@
 import { consume } from '@lit/context';
 import { LitElement, html, css } from 'lit';
-import { customElement, state } from 'lit/decorators.js';
+import { customElement, state, property } from 'lit/decorators.js';
 import { Layout, layoutContext, Scale2Number } from './api/layout';
 import { layoutClient } from './api/client.js';
 import { 
@@ -13,18 +13,32 @@ import {
 
 @customElement('rr-settings')
 export class RrSettings extends LitElement {
-  // Styles omitted (static styles = ...) - assuming replace_file_content preserves if I don't touch? 
-  // Wait, I must provide replacement for range. I will target specific blocks or replace file if mostly changed.
-  // I will use multi_replace for safer editing.
-  
   static styles = css`
     :host {
-      display: block;
-      width: 100%;
+      display: flex;
+      flex-direction: column;
       height: 100%;
-      box-sizing: border-box;
+      background: var(--sl-panel-background-color);
+      border-left: 1px solid var(--sl-color-neutral-300);
+      overflow: hidden;
+      user-select: none;
     }
     
+    .content {
+      flex-grow: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
+
+    .footer {
+        padding: 1rem;
+        background: var(--sl-color-neutral-50);
+        border-top: 1px solid var(--sl-color-neutral-300);
+        display: flex;
+        justify-content: flex-end;
+        flex-shrink: 0;
+    }
+
     * {
       box-sizing: border-box;
     }
@@ -44,7 +58,9 @@ export class RrSettings extends LitElement {
       text-align: right;
       padding-right: 12px;
       vertical-align: middle;
-      width: 150px;
+      width: 100px;
+      font-size: 0.9rem;
+      color: var(--sl-color-neutral-600);
     }
 
     .settings-field {
@@ -57,7 +73,6 @@ export class RrSettings extends LitElement {
     sl-dropdown,
     sl-select {
       width: 100%;
-      max-width: 300px;
     }
 
     /* Classifier Tab Styles */
@@ -71,10 +86,37 @@ export class RrSettings extends LitElement {
     sl-radio-group::part(button-group) {
         gap: 8px;
     }
+
+    h3 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1rem;
+      color: var(--sl-color-neutral-600);
+    }
+
+    sl-tab-group {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    sl-tab-group::part(base) {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    sl-tab-group::part(body) {
+        flex-grow: 1;
+        overflow-y: auto;
+    }
   `;
 
   @consume({ context: layoutContext, subscribe: true })
   layout!: Layout;
+
+  @property({ type: Boolean, reflect: true })
+  open = false;
 
   @state()
   private _selectedModel: string = DEFAULT_MODEL;
@@ -98,13 +140,16 @@ export class RrSettings extends LitElement {
   get layoutScale() { return this.layout?.layout?.scale || 'HO'; }
   // Backend uses referenceDistanceMm.
   get layoutReferenceDistance() { return this.layout?.layout?.referenceDistanceMm || 0; }
-  get cameraResolution() { return { width: 0, height: 0 }; } // Stub implementation
 
   connectedCallback() {
       super.connectedCallback();
       this._initClassifierSettings();
       this._fetchLayouts();
       this._fetchUser();
+  }
+
+  private _handleClose() {
+    this.dispatchEvent(new CustomEvent('close-settings', { bubbles: true, composed: true }));
   }
 
   willUpdate(changedProperties: Map<string, any>) {
@@ -198,23 +243,28 @@ export class RrSettings extends LitElement {
 
   render() {
     return html`
-      <sl-tab-group>
-        <sl-tab slot="nav" panel="profile">Profile</sl-tab>
-        <sl-tab slot="nav" panel="layout">Layout</sl-tab>
-        <sl-tab slot="nav" panel="project">Projects</sl-tab>
+      <div class="content">
+        <sl-tab-group>
+            <sl-tab slot="nav" panel="profile">Profile</sl-tab>
+            <sl-tab slot="nav" panel="layout">Layout</sl-tab>
+            <sl-tab slot="nav" panel="project">Projects</sl-tab>
 
-        <sl-tab-panel name="profile">
-          ${this._renderProfileSettings()}
-        </sl-tab-panel>
+            <sl-tab-panel name="profile">
+            ${this._renderProfileSettings()}
+            </sl-tab-panel>
 
-        <sl-tab-panel name="layout">
-          ${this._renderLayoutSettings()}
-        </sl-tab-panel>
+            <sl-tab-panel name="layout">
+            ${this._renderLayoutSettings()}
+            </sl-tab-panel>
 
-        <sl-tab-panel name="project">
-          ${this._renderProjectSettings()}
-        </sl-tab-panel>
-      </sl-tab-group>
+            <sl-tab-panel name="project">
+            ${this._renderProjectSettings()}
+            </sl-tab-panel>
+        </sl-tab-group>
+      </div>
+      <div class="footer">
+        <sl-button variant="default" size="small" @click=${this._handleClose}>Close</sl-button>
+      </div>
     `;
   }
 
@@ -226,33 +276,36 @@ export class RrSettings extends LitElement {
             <div class="settings-row">
                 <div class="settings-label">Email:</div>
                 <div class="settings-field">
-                    <sl-input value=${this._user.email} readonly disabled></sl-input>
+                    <sl-input value=${this._user.email} readonly disabled size="small"></sl-input>
                 </div>
             </div>
             <div class="settings-row">
                 <div class="settings-label">Role:</div>
                 <div class="settings-field">
-                    <sl-input value=${this._user.role} readonly disabled></sl-input>
+                    <sl-input value=${this._user.role} readonly disabled size="small"></sl-input>
                 </div>
             </div>
             <sl-divider></sl-divider>
             <div class="settings-row">
-                <div class="settings-label">Profile Info:</div>
+                <div class="settings-label">Profile:</div>
                 <div class="settings-field">
                     <sl-textarea 
                         value=${this._user.profile || ''} 
                         @sl-change=${(e: any) => this._handleUserUpdate({ profile: e.target.value })}
-                        placeholder="Enter personal information"
+                        placeholder="Enter profile info"
+                        size="small"
+                        rows="2"
                     ></sl-textarea>
                 </div>
             </div>
             <div class="settings-row">
-                <div class="settings-label">MQTT Broker:</div>
+                <div class="settings-label">MQTT:</div>
                 <div class="settings-field">
                     <sl-input 
                         value=${this._user.mqttBroker || ''} 
                         @sl-change=${(e: any) => this._handleUserUpdate({ mqttBroker: e.target.value })}
                         placeholder="mqtt://localhost:1883"
+                        size="small"
                     ></sl-input>
                 </div>
             </div>
@@ -276,39 +329,42 @@ export class RrSettings extends LitElement {
         <div class="settings-table">
         <div class="settings-row">
           <div class="settings-label">Name:</div>
-          <div class="settings-field" style="display: flex; gap: 1rem; align-items: center;">
+          <div class="settings-field" style="display: flex; gap: 0.5rem; align-items: center;">
             <sl-input
               value=${this.layoutName}
               @sl-input=${this._handleLayoutNameChange}
-              style="flex-grow: 1;"
+              size="small"
             >
             </sl-input>
             <sl-icon-button 
                 name="trash" 
                 label="Delete Layout"
-                style="font-size: 1.3rem; color: var(--sl-color-danger-600);"
+                style="font-size: 1rem; color: var(--sl-color-danger-600);"
                 @click=${() => this._handleDeleteLayout(this.layout.id)}
             ></sl-icon-button>
           </div>
         </div>
         <div class="settings-row">
-          <div class="settings-label">Description:</div>
+          <div class="settings-label">Desc:</div>
           <div class="settings-field">
             <sl-textarea
               value=${this.layoutDescription}
               @sl-change=${(e: any) => this.layout.setDescription(e.target.value)}
-              placeholder="Layout description..."
+              placeholder="Description..."
+              size="small"
+              rows="2"
             ></sl-textarea>
           </div>
         </div>
         <sl-divider></sl-divider>
         <div class="settings-row">
-          <div class="settings-label">Ref Dist [mm]:</div>
+          <div class="settings-label">Ref [mm]:</div>
           <div class="settings-field">
             <sl-input
               type="number"
               value=${this.layoutReferenceDistance}
               @sl-change=${this._handleReferenceDistanceChange}
+              size="small"
             ></sl-input>
           </div>
         </div>
@@ -316,7 +372,7 @@ export class RrSettings extends LitElement {
           <div class="settings-label">Scale:</div>
           <div class="settings-field">
             <sl-dropdown>
-              <sl-button class="scale" slot="trigger" caret>
+              <sl-button slot="trigger" caret size="small" style="width: 100%;">
                 ${this.layoutScale}
               </sl-button>
               <sl-menu @sl-select=${this._handleScaleSelect}>
@@ -332,22 +388,24 @@ export class RrSettings extends LitElement {
         </div>
         <sl-divider></sl-divider>
         <div class="settings-row">
-            <div class="settings-label">Classifier:</div>
+            <div class="settings-label">Model:</div>
             <div class="settings-field">
                 <sl-radio-group 
                     value=${this._selectedModel}
                     @sl-change=${this._handleModelChange}
+                    size="small"
                 >
                     ${MODEL_LIST.map(m => html`<sl-radio-button value=${m}>${m}</sl-radio-button>`)}
                 </sl-radio-group>
             </div>
         </div>
         <div class="settings-row">
-            <div class="settings-label">Precision:</div>
+            <div class="settings-label">Prec:</div>
             <div class="settings-field">
                 <sl-radio-group 
                     value=${this._selectedPrecision}
                     @sl-change=${this._handlePrecisionChange}
+                    size="small"
                 >
                     ${PRECISION_OPTIONS.map(p => html`<sl-radio-button value=${p}>${p}</sl-radio-button>`)}
                 </sl-radio-group>
@@ -355,12 +413,13 @@ export class RrSettings extends LitElement {
         </div>
         <sl-divider></sl-divider>
         <div class="settings-row">
-            <div class="settings-label">MQTT Topic:</div>
+            <div class="settings-label">MQTT:</div>
             <div class="settings-field">
                 <sl-input 
                     value=${this.layoutMqttTopic} 
                     @sl-change=${(e: any) => this.layout.setMqttTopic(e.target.value)}
-                    placeholder="marker/predict"
+                    placeholder="Topic..."
+                    size="small"
                 ></sl-input>
             </div>
         </div>
@@ -374,63 +433,57 @@ export class RrSettings extends LitElement {
       return html`
         <div style="padding: 1rem; display: flex; flex-direction: column; gap: 1rem;">
             <div>
-                <h3>Create New Layout</h3>
-                <div style="display: flex; flex-direction: column; gap: 1rem; max-width: 300px;">
+                <h3 style="font-size: 0.9rem;">New Layout</h3>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <sl-input 
-                        label="Layout Name" 
+                        placeholder="Name" 
                         value=${this._newLayoutName} 
                         @sl-input=${(e: any) => this._newLayoutName = e.target.value}
+                        size="small"
                     ></sl-input>
                     
                     <sl-select 
-                        label="Scale" 
+                        placeholder="Scale" 
                         value=${this._newLayoutScale}
                         @sl-change=${(e: any) => this._newLayoutScale = e.target.value}
+                        size="small"
                     >
                         ${Object.keys(Scale2Number).map(s => html`<sl-option value=${s}>${s}</sl-option>`)}
                     </sl-select>
-
-                    <sl-button variant="primary" @click=${this._handleCreateLayout}>Create Layout</sl-button>
+                    <sl-button variant="primary" size="small" @click=${this._handleCreateLayout}>Create</sl-button>
                 </div>
             </div>
 
             <sl-divider></sl-divider>
 
             <div>
-                <h3>Manage Layouts</h3>
+                <h3 style="font-size: 0.9rem;">Manage</h3>
                 <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     ${this._layouts.map(l => html`
-                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; border: 1px solid var(--sl-color-neutral-200); border-radius: var(--sl-border-radius-medium);">
-                            <span>${l.name} (${l.scale})</span>
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.25rem 0.5rem; border: 1px solid var(--sl-color-neutral-200); border-radius: var(--sl-border-radius-medium); font-size: 0.85rem;">
+                            <span>${l.name}</span>
                             <sl-icon-button 
                                 name="trash" 
-                                label="Delete Layout"
-                                style="font-size: 1.2rem; color: var(--sl-color-danger-600);"
+                                label="Delete"
+                                style="font-size: 0.9rem; color: var(--sl-color-danger-600);"
                                 @click=${() => this._handleDeleteLayout(l.id)}
                             ></sl-icon-button>
                         </div>
                     `)}
-                    ${this._layouts.length === 0 ? html`<p style="color: var(--sl-color-neutral-500);">No layouts found.</p>` : ''}
                 </div>
             </div>
         </div>
       `;
   }
 
-  // TODO: backup & restore layouts
-
   private async _handleDeleteLayout(id: string) {
-      if (!confirm("Are you sure you want to delete this layout? This cannot be undone.")) return;
-      
-      // Remove focus from the button to avoid 'Blocked aria-hidden' warnings during re-render
+      if (!confirm("Delete this layout?")) return;
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 
       try {
           await layoutClient.deleteLayout(id);
           await this._fetchLayouts();
           
-          // If the deleted layout was the current one, we might want to switch or alert.
-          // For now, let's just refresh the list.
           if (id === this.layout.id) {
               if (this._layouts.length > 0) {
                    this.dispatchEvent(new CustomEvent('layout-selected', { 
@@ -439,37 +492,27 @@ export class RrSettings extends LitElement {
                       composed: true 
                   }));
               } else {
-                  // Fallback: reload page or notify
                   window.location.reload();
               }
           }
-          this.dispatchEvent(new CustomEvent('close-settings', { bubbles: true, composed: true }));
       } catch (e) {
           alert("Failed to delete layout");
-          console.error(e);
       }
   }
 
   private async _handleCreateLayout() {
-      // Remove focus from the button to avoid 'Blocked aria-hidden' warnings during re-render
       if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-
       if (!this._newLayoutName) return alert("Name required");
       try {
           const layout = await layoutClient.createLayout(this._newLayoutName, this._newLayoutScale);
-          // Refresh list and name
           await this._fetchLayouts();
-          
-          // Dispatch selection
           this.dispatchEvent(new CustomEvent('layout-selected', { 
               detail: { layoutId: layout.id },
               bubbles: true, 
               composed: true 
           }));
-          this.dispatchEvent(new CustomEvent('close-settings', { bubbles: true, composed: true }));
       } catch (e) {
           alert("Failed to create layout");
-          console.error(e);
       }
   }
 

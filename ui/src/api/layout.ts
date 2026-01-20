@@ -226,6 +226,7 @@ export class Layout extends EventTarget {
             id: crypto.randomUUID(),
             layoutId: this._dataInternal.id,
             markers: {},
+            useForTraining: false,
             createdAt: new Date().toISOString()
         });
 
@@ -257,6 +258,7 @@ export class Layout extends EventTarget {
                 id: crypto.randomUUID(),
                 layoutId: this._dataInternal.id,
                 markers: {},
+                useForTraining: false,
                 createdAt: new Date().toISOString()
              });
         }

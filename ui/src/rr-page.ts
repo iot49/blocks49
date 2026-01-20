@@ -1,8 +1,8 @@
 import { LitElement, html, css } from 'lit';
-import { customElement, state, property } from 'lit/decorators.js';
-import '@shoelace-style/shoelace/dist/components/dialog/dialog.js';
-import '@shoelace-style/shoelace/dist/components/select/select.js';
+import { customElement, property, state } from 'lit/decorators.js';
 import '@shoelace-style/shoelace/dist/components/option/option.js';
+import '@shoelace-style/shoelace/dist/components/split-panel/split-panel.js';
+import '@shoelace-style/shoelace/dist/components/divider/divider.js';
 import './rr-settings.ts';
 
 /**
@@ -12,14 +12,29 @@ import './rr-settings.ts';
  * - A view toggle button (dispatches 'rr-view-toggle').
  * - A slot for view-specific status information.
  * - A settings button to open the global configuration dialog.
- * 
- * It also encapsulates the Shoelace dialog used for application-wide settings.
  */
 @customElement('rr-page')
 export class RrPage extends LitElement {
   @property({ type: String })
   viewMode: 'editor' | 'live' = 'editor';
-  // ... styles ...
+
+  @state()
+  private _settingsPosition = 100;
+
+  @state()
+  private _lastOpenPosition = 70;
+
+  constructor() {
+    super();
+    const saved = localStorage.getItem('rr-settings-position');
+    if (saved) {
+      const pos = parseFloat(saved);
+      if (pos > 10 && pos < 90) {
+        this._lastOpenPosition = pos;
+      }
+    }
+  }
+
   static styles = css`
     :host {
       display: flex;
@@ -55,7 +70,6 @@ export class RrPage extends LitElement {
       gap: 0.5em;
     }
 
-
     main {
       flex-grow: 1;
       display: flex;
@@ -85,17 +99,21 @@ export class RrPage extends LitElement {
     }
   `;
 
-  // No longer managing layouts here. 
-  // RrLayoutEditor will handle its own selection.
-
-  @state()
-  private _isSettingsOpen = false;
+  connectedCallback() {
+      super.connectedCallback();
+      this.addEventListener('open-settings', () => this._settingsPosition = this._lastOpenPosition);
+      this.addEventListener('close-settings', () => this._settingsPosition = 100);
+  }
 
   /**
-   * Opens the settings dialog.
+   * Toggles the settings panel open or closed.
    */
   private _handleSettingsClick() {
-    this._isSettingsOpen = true;
+    if (this._settingsPosition === 100) {
+      this._settingsPosition = this._lastOpenPosition;
+    } else {
+      this._settingsPosition = 100;
+    }
   }
 
   /**
@@ -130,18 +148,25 @@ export class RrPage extends LitElement {
         </div>
       </header>
       <main>
-        <slot></slot>
+        <sl-split-panel 
+            position=${this._settingsPosition} 
+            @sl-reposition=${(e: any) => {
+                this._settingsPosition = e.target.position;
+                if (this._settingsPosition < 100) { // Only save position if not fully closed
+                    this._lastOpenPosition = this._settingsPosition;
+                    localStorage.setItem('rr-settings-position', this._lastOpenPosition.toString());
+                }
+            }}
+            style="height: 100%;"
+        >
+            <div slot="start" style="height: 100%; display: flex; flex-direction: column;">
+                <slot></slot>
+            </div>
+            <div slot="end" style="height: 100%; overflow: hidden;">
+                <rr-settings .open=${this._settingsPosition < 100}></rr-settings>
+            </div>
+        </sl-split-panel>
       </main>
-      
-      <sl-dialog 
-        label="Settings" 
-        .open=${this._isSettingsOpen} 
-        @sl-after-hide=${() => this._isSettingsOpen = false}
-        @close-settings=${() => this._isSettingsOpen = false}
-        style="--width: 600px;"
-      >
-        <rr-settings></rr-settings>
-      </sl-dialog>
     `;
   }
 }
