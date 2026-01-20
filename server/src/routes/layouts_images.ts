@@ -3,8 +3,9 @@ import { getDb } from '../db/index.js';
 import { getStorage } from '../services/storage.js';
 import { images, layouts } from '../db/schema.js';
 import type { AuthUser } from '../middleware/auth.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, count } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import { MAX_IMAGES } from '../../../shared/config.js';
 
 type Env = {
   Variables: {
@@ -63,6 +64,19 @@ userUploadRoutes.post('/:layoutId/images', async (c) => {
         .get();
         
     if (!layout) return c.json({ error: 'Layout not found or unauthorized' }, 404);
+    
+    // Enforce Limit
+    const [{ count: currentCount }] = await db.select({ count: count() })
+        .from(images)
+        .where(eq(images.layoutId, layoutId))
+        .all();
+
+    if (currentCount >= MAX_IMAGES) {
+        return c.json({ 
+            error: 'Image limit reached', 
+            message: `This layout has reached the maximum of ${MAX_IMAGES} images. Please delete an existing image to upload a new one.` 
+        }, 403);
+    }
 
     try {
         const newImage = await performUpload(c, layoutId, false); // Users cannot set training flag

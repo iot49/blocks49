@@ -1,12 +1,13 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, count } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { getDb } from '../db/index.js';
 import { layouts, images, users } from '../db/schema.js';
 import type { AuthUser } from '../middleware/auth.js';
 import { getStorage } from '../services/storage.js';
+import { MAX_LAYOUTS } from '../../../shared/config.js';
 
 type Env = {
   Variables: {
@@ -65,6 +66,19 @@ userRoutes.post('/', zValidator('json', layoutSchema), async (c) => {
   const body = c.req.valid('json');
   const db = getDb(c);
   
+  // Enforce Limit
+  const [{ count: currentCount }] = await db.select({ count: count() })
+    .from(layouts)
+    .where(eq(layouts.userId, user.id))
+    .all();
+    
+  if (currentCount >= MAX_LAYOUTS) {
+    return c.json({ 
+        error: 'Layout limit reached', 
+        message: `You have reached the maximum of ${MAX_LAYOUTS} layouts. Please delete an existing layout to create a new one.` 
+    }, 403);
+  }
+
   const newId = randomUUID();
   const newLayout = {
       id: newId,
