@@ -1,5 +1,14 @@
 #!/bin/bash
-# Run server tests from the root directory
+# Run all server tests
 
-cd "$(dirname "$0")/../server"
+set -e
+
+# Resolve the project root and server directories
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+SERVER_DIR="$BIN_DIR/../server"
+
+echo "🚀 Running server tests..."
+
+# Run migrations and tests
+cd "$SERVER_DIR"
 npm test

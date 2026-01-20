@@ -332,7 +332,7 @@ export class RrSettings extends LitElement {
         </div>
         <sl-divider></sl-divider>
         <div class="settings-row">
-            <div class="settings-label">Model:</div>
+            <div class="settings-label">Classifier:</div>
             <div class="settings-field">
                 <sl-radio-group 
                     value=${this._selectedModel}

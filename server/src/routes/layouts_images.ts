@@ -20,8 +20,12 @@ async function performUpload(c: any, layoutId: string, useForTraining: boolean =
     const file = body['file'];
     const markersRaw = body['markers'] || body['labels'];
 
-    if (!file || !(file instanceof File)) {
+    if (!file) {
         throw new Error('No file uploaded');
+    }
+    // Handle both File and Blob if they are similar enough
+    if (typeof (file as any).arrayBuffer !== 'function') {
+        throw new Error(`Invalid file upload object: ${typeof file}`);
     }
 
     let markersJson = null;
@@ -65,20 +69,20 @@ userUploadRoutes.post('/:layoutId/images', async (c) => {
         
     if (!layout) return c.json({ error: 'Layout not found or unauthorized' }, 404);
     
-    // Enforce Limit
-    const [{ count: currentCount }] = await db.select({ count: count() })
-        .from(images)
-        .where(eq(images.layoutId, layoutId))
-        .all();
-
-    if (currentCount >= MAX_IMAGES) {
-        return c.json({ 
-            error: 'Image limit reached', 
-            message: `This layout has reached the maximum of ${MAX_IMAGES} images. Please delete an existing image to upload a new one.` 
-        }, 403);
-    }
-
     try {
+        // Enforce Limit
+        const [{ count: currentCount }] = await db.select({ count: count() })
+            .from(images)
+            .where(eq(images.layoutId, layoutId))
+            .all();
+
+        if (currentCount >= MAX_IMAGES) {
+            return c.json({ 
+                error: 'Image limit reached', 
+                message: `This layout has reached the maximum of ${MAX_IMAGES} images. Please delete an existing image to upload a new one.` 
+            }, 403);
+        }
+
         const newImage = await performUpload(c, layoutId, false); // Users cannot set training flag
         return c.json({ image: newImage }, 201);
     } catch (e: any) {

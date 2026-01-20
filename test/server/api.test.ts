@@ -90,8 +90,8 @@ describe('Basic API', () => {
 
         // 2. Upload an image
         const formData = new FormData();
-        const blob = new Blob(['fake image data'], { type: 'image/jpeg' });
-        formData.append('file', blob, 'test.jpg');
+        const file = new File(['fake image data'], 'test.jpg', { type: 'image/jpeg' });
+        formData.append('file', file);
         formData.append('markers', JSON.stringify({ 'marker-1': { x: 10, y: 20, type: 'train' } }));
 
         const uploadRes = await app.request(`/api/user/layouts/${layoutId}/images?user=uploader@test.com`, {
