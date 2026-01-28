@@ -129,7 +129,16 @@ export class LayoutClient {
             body: formData
         });
 
-        if (!res.ok) throw new Error(`Failed to upload image: ${res.statusText} (${res.status})`);
+        if (!res.ok) {
+            let errorMsg = res.statusText;
+            try {
+                const errorData = await res.json();
+                errorMsg = errorData.error || errorData.message || res.statusText;
+            } catch (e) {
+                // ignore if not json
+            }
+            throw new Error(`Failed to upload image: ${errorMsg} (${res.status})`);
+        }
         const data = await res.json();
         return data.image;
     }

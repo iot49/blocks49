@@ -21,10 +21,12 @@ async function performUpload(c: any, layoutId: string, useForTraining: boolean =
     const markersRaw = body['markers'] || body['labels'];
 
     if (!file) {
+        console.error(`[Backend] Upload failed: No file found in request body for layout ${layoutId}`);
         throw new Error('No file uploaded');
     }
-    // Handle both File and Blob if they are similar enough
-    if (typeof (file as any).arrayBuffer !== 'function') {
+    
+    if (!(file instanceof Blob) && typeof (file as any).arrayBuffer !== 'function') {
+        console.error(`[Backend] Upload failed: Invalid file object type: ${typeof file} for layout ${layoutId}`);
         throw new Error(`Invalid file upload object: ${typeof file}`);
     }
 
