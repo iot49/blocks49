@@ -247,7 +247,6 @@ export class RrSettings extends LitElement {
         <sl-tab-group>
             <sl-tab slot="nav" panel="profile">Profile</sl-tab>
             <sl-tab slot="nav" panel="layout">Layout</sl-tab>
-            <sl-tab slot="nav" panel="project">Projects</sl-tab>
 
             <sl-tab-panel name="profile">
             ${this._renderProfileSettings()}
@@ -255,10 +254,6 @@ export class RrSettings extends LitElement {
 
             <sl-tab-panel name="layout">
             ${this._renderLayoutSettings()}
-            </sl-tab-panel>
-
-            <sl-tab-panel name="project">
-            ${this._renderProjectSettings()}
             </sl-tab-panel>
         </sl-tab-group>
       </div>
@@ -325,7 +320,14 @@ export class RrSettings extends LitElement {
 
   private _renderLayoutSettings() {
     return html`
-      <div style="padding: 1rem;">
+      <div style="padding: 1rem; display: flex; flex-direction: column; gap: 1rem;">
+        <div style="display: flex; justify-content: flex-end;">
+            <sl-button variant="primary" size="small" @click=${this._handleCreateLayout}>
+                <sl-icon slot="prefix" name="plus-lg"></sl-icon>
+                New Layout
+            </sl-button>
+        </div>
+        <sl-divider></sl-divider>
         <div class="settings-table">
         <div class="settings-row">
           <div class="settings-label">Name:</div>
@@ -429,52 +431,6 @@ export class RrSettings extends LitElement {
   }
 
 
-  private _renderProjectSettings() {
-      return html`
-        <div style="padding: 1rem; display: flex; flex-direction: column; gap: 1rem;">
-            <div>
-                <h3 style="font-size: 0.9rem;">New Layout</h3>
-                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                    <sl-input 
-                        placeholder="Name" 
-                        value=${this._newLayoutName} 
-                        @sl-input=${(e: any) => this._newLayoutName = e.target.value}
-                        size="small"
-                    ></sl-input>
-                    
-                    <sl-select 
-                        placeholder="Scale" 
-                        value=${this._newLayoutScale}
-                        @sl-change=${(e: any) => this._newLayoutScale = e.target.value}
-                        size="small"
-                    >
-                        ${Object.keys(Scale2Number).map(s => html`<sl-option value=${s}>${s}</sl-option>`)}
-                    </sl-select>
-                    <sl-button variant="primary" size="small" @click=${this._handleCreateLayout}>Create</sl-button>
-                </div>
-            </div>
-
-            <sl-divider></sl-divider>
-
-            <div>
-                <h3 style="font-size: 0.9rem;">Manage</h3>
-                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                    ${this._layouts.map(l => html`
-                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.25rem 0.5rem; border: 1px solid var(--sl-color-neutral-200); border-radius: var(--sl-border-radius-medium); font-size: 0.85rem;">
-                            <span>${l.name}</span>
-                            <sl-icon-button 
-                                name="trash" 
-                                label="Delete"
-                                style="font-size: 0.9rem; color: var(--sl-color-danger-600);"
-                                @click=${() => this._handleDeleteLayout(l.id)}
-                            ></sl-icon-button>
-                        </div>
-                    `)}
-                </div>
-            </div>
-        </div>
-      `;
-  }
 
   private async _handleDeleteLayout(id: string) {
       if (!confirm("Delete this layout?")) return;
