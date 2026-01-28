@@ -151,8 +151,22 @@ export class RrPage extends LitElement {
         <sl-split-panel 
             position=${this._settingsPosition} 
             @sl-reposition=${(e: any) => {
-                this._settingsPosition = e.target.position;
-                if (this._settingsPosition < 100) { // Only save position if not fully closed
+                const newPos = e.detail.position;
+                
+                // Guard 1: Ignore invalid/undefined values
+                if (newPos === undefined || newPos === null || isNaN(newPos)) {
+                    return;
+                }
+
+                // Guard 2: If we are intentionally closed (100), ignore accidental snaps to 0 or 100
+                if (this._settingsPosition === 100 && (newPos === 0 || newPos === 100)) {
+                    return;
+                }
+
+                this._settingsPosition = newPos;
+                
+                // Only persist sane open positions (between 10% and 90% of screen)
+                if (this._settingsPosition > 10 && this._settingsPosition < 90) {
                     this._lastOpenPosition = this._settingsPosition;
                     localStorage.setItem('rr-settings-position', this._lastOpenPosition.toString());
                 }
