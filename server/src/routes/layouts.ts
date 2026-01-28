@@ -136,6 +136,7 @@ userRoutes.patch('/:id', zValidator('json', patchLayoutSchema), async (c) => {
     if (!layout) return c.json({ error: 'Not found' }, 404);
 
     const updateData = { ...body, updatedAt: new Date() };
+
     const updated = await db.update(layouts)
         .set(updateData)
         .where(eq(layouts.id, id))
