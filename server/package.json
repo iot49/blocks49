@@ -21,13 +21,16 @@
     "better-sqlite3": "^12.5.0",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
+    "googleapis": "^170.1.0",
     "hono": "^4.11.3",
+    "node-cron": "^4.2.1",
     "zod": "^4.2.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260117.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.0.3",
+    "@types/node-cron": "^3.0.11",
     "drizzle-kit": "^0.31.8",
     "esbuild": "^0.27.2",
     "tsx": "^4.21.0",

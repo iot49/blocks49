@@ -6,10 +6,10 @@ const distDir = path.join(process.cwd(), 'dist');
 mkdirSync(distDir, { recursive: true });
 
 await esbuild.build({
-  entryPoints: ['src/app.ts'],
+  entryPoints: ['src/worker.ts'],
   bundle: true,
   outfile: 'dist/_worker.js',
-  platform: 'browser', // Cloudflare Workers are closer to browser than node
+  platform: 'browser',
   format: 'esm',
   target: 'es2022',
   external: [

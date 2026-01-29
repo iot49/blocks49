@@ -247,6 +247,7 @@ export class RrSettings extends LitElement {
         <sl-tab-group>
             <sl-tab slot="nav" panel="profile">Profile</sl-tab>
             <sl-tab slot="nav" panel="layout">Layout</sl-tab>
+            <sl-tab slot="nav" panel="export">Export</sl-tab>
 
             <sl-tab-panel name="profile">
             ${this._renderProfileSettings()}
@@ -254,6 +255,10 @@ export class RrSettings extends LitElement {
 
             <sl-tab-panel name="layout">
             ${this._renderLayoutSettings()}
+            </sl-tab-panel>
+
+            <sl-tab-panel name="export">
+            ${this._renderExportSettings()}
             </sl-tab-panel>
         </sl-tab-group>
       </div>
@@ -495,6 +500,41 @@ export class RrSettings extends LitElement {
     const menuItem = (event as CustomEvent).detail.item;
     const scale = menuItem.value as string;
     this.layout.setScale(scale);
+  }
+
+  private _renderExportSettings() {
+    return html`
+      <div style="padding: 1rem; display: flex; flex-direction: column; gap: 1rem;">
+        <p style="color: var(--sl-color-neutral-600); font-size: 0.9rem;">
+            Export the entire database and images to your configured Google Drive.
+        </p>
+        <sl-button variant="primary" @click=${this._handleExport}>
+            <sl-icon slot="prefix" name="cloud-upload"></sl-icon>
+            Export to Google Drive
+        </sl-button>
+      </div>
+    `;
+  }
+
+  private async _handleExport() {
+      if (!confirm("Start export to Google Drive? This might take a while.")) return;
+      
+      try {
+          // Determine API URL based on environment (dev vs prod)
+          // In dev (vite proxy): /api/db/export
+          // In prod: same relative path logic usually works if served from same origin.
+          const res = await fetch('/api/db/export', { method: 'POST' });
+          const data = await res.json();
+          
+          if (res.ok && data.success) {
+              alert(`Export Successful!\nFolder: ${data.folderName}\nFile: ${data.dbFile}\nImages: ${data.stats.uploaded}/${data.stats.totalImages} (Skipped: ${data.stats.skipped})`);
+          } else {
+              throw new Error(data.details || data.error || 'Unknown error');
+          }
+      } catch (e: any) {
+          console.error("Export failed", e);
+          alert(`Export Failed: ${e.message}`);
+      }
   }
 
   private _handleReferenceDistanceChange(event: Event) {

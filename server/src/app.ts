@@ -5,6 +5,7 @@ import { rbacMiddleware } from './middleware/rbac.js';
 import { adminRoutes as adminLayoutRoutes, userRoutes as userLayoutRoutes } from './routes/layouts.js';
 import { adminUploadRoutes, userUploadRoutes } from './routes/layouts_images.js';
 import { adminImageRoutes, userImageRoutes } from './routes/images.js';
+import { exportRoutes } from './routes/export.js';
 import userRoutes from './routes/users.js';
 import { HTTPException } from 'hono/http-exception';
 
@@ -66,6 +67,7 @@ app.route('/api/user/layouts', userUploadRoutes);
 
 app.route('/api/images', userImageRoutes); 
 app.route('/api/admin/images', adminImageRoutes); 
+app.route('/api/db/export', exportRoutes); 
 
 app.route('/api/users', userRoutes); 
 

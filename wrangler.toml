@@ -12,6 +12,9 @@ database_id = "41cc44eb-ccb9-49f4-968f-70a1ddff133e"
 binding = "IMAGES"
 bucket_name = "rails49-assets"
 
+
+
+
 [vars]
 ADMIN_EMAIL = "bernhard.e.boser@gmail.com"
 NODE_ENV = "production"

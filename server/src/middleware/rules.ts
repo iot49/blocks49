@@ -29,5 +29,6 @@ export const rules: RbacRule[] = [
     { method: "patch", pattern: "/api/images/*", role: "user" },
     { method: "delete", pattern: "/api/images/*", role: "user" },
     { method: "get", pattern: "/api/admin/images/*", role: "admin" },
-    { method: "patch", pattern: "/api/admin/images/*/training", role: "admin" }
+    { method: "patch", pattern: "/api/admin/images/*/training", role: "admin" },
+    { method: "post", pattern: "/api/db/export", role: "admin" }
 ];
