@@ -1,16 +1,16 @@
-name = "rails49"
+name = "blocks49"
 compatibility_date = "2026-01-17"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "ui/dist"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "rails49-db"
-database_id = "41cc44eb-ccb9-49f4-968f-70a1ddff133e"
+database_name = "blocks49-db"
+database_id = "98f23dbc-7d62-43b2-be3c-2a835445ed3f"
 
 [[r2_buckets]]
 binding = "IMAGES"
-bucket_name = "rails49-assets"
+bucket_name = "blocks49-assets"
 
 
 

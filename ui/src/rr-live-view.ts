@@ -175,7 +175,7 @@ export class RrLiveView extends LitElement {
       const brokerUrl = this._user?.mqttBroker || `ws://${window.location.hostname}:8083`;
       console.log(`[MQTT] Connecting to ${brokerUrl}...`);
       this._mqttClient = mqtt.connect(brokerUrl, {
-          clientId: `rails49_ui_${Math.random().toString(16).slice(2, 10)}`,
+          clientId: `blocks49_ui_${Math.random().toString(16).slice(2, 10)}`,
           clean: true,
           connectTimeout: 4000,
           reconnectPeriod: 1000,

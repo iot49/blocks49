@@ -5,16 +5,16 @@ import argparse
 import matplotlib.pyplot as plt
 from fastai.data.all import set_seed
 
+from classifier import B49DataLoaders, B49Dataset, apply_scaling_transform
 from classifier import LearnerConfig as Config
-from classifier import R49DataLoaders, R49Dataset, apply_scaling_transform
 
 """
-Show random samples from R49Dataset.
+Show random samples from B49Dataset.
 """
 
 
 def show_samples():
-    parser = argparse.ArgumentParser(description="Show random samples from R49Dataset")
+    parser = argparse.ArgumentParser(description="Show random samples from B49Dataset")
     parser.add_argument(
         "model", nargs="?", default="resnet18", help="Model name (to load config)"
     )
@@ -43,7 +43,7 @@ def show_samples():
         print("No .r49 files found.")
         return
 
-    ds = R49Dataset(
+    ds = B49Dataset(
         files,
         dpt=dpt,
         size=size,
@@ -59,8 +59,8 @@ def show_samples():
     ROWS = 3
 
     # Create dataloaders
-    print("Creating R49DataLoaders...")
-    dls = R49DataLoaders.from_dataset(
+    print("Creating B49DataLoaders...")
+    dls = B49DataLoaders.from_dataset(
         ds,
         valid_pct=0,
         crop_size=size,
@@ -68,7 +68,7 @@ def show_samples():
         vocab=labels,
         data_augmentation=args.no_aug,
     )
-    # R49DataLoaders applies CropPad in item_tfms and Rotate in batch_tfms.
+    # B49DataLoaders applies CropPad in item_tfms and Rotate in batch_tfms.
     # We want to iterate batches from the training loader to see final tensors.
 
     # Iterator for batches
@@ -107,7 +107,7 @@ def show_samples():
             # FastAI TensorImage is already close, but we need to permute for matplotlib (C,H,W -> H,W,C)
             img_tensor = x[i].cpu().permute(1, 2, 0)
 
-            # Denormalize if normalized? R49DataLoaders didn't add Normalize callback explicitely
+            # Denormalize if normalized? B49DataLoaders didn't add Normalize callback explicitely
             # but usually it's good to check.
             # Assuming 0-1 float or 0-255 byte.
 

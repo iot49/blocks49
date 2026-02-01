@@ -3,11 +3,11 @@ import readline from 'readline';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-const CLIENT_ID = process.env.RAILS49_EXPORT_CLIENT_ID || process.argv[2];
-const CLIENT_SECRET = process.env.RAILS49_EXPORT_CLIENT_SECRET || process.argv[3];
+const CLIENT_ID = process.env.BLOCKS49_EXPORT_CLIENT_ID || process.argv[2];
+const CLIENT_SECRET = process.env.BLOCKS49_EXPORT_CLIENT_SECRET || process.argv[3];
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
-  console.log('Error: Could not find RAILS49_EXPORT_CLIENT_ID/SECRET in .env or arguments.');
+  console.log('Error: Could not find BLOCKS49_EXPORT_CLIENT_ID/SECRET in .env or arguments.');
   console.log('Usage: npx tsx scripts/get-refresh-token.ts <CLIENT_ID> <CLIENT_SECRET>');
   process.exit(1);
 }
@@ -46,14 +46,14 @@ const rl = readline.createInterface({
 
 rl.question('Paste the code here: ', async (code) => {
   rl.close();
-  // Clean up code just in case
-  const cleanCode = decodeURIComponent(code).replace('&scope=', '').split('&')[0];
+  // Clean up code just in case - the code is before any query parameters
+  const cleanCode = decodeURIComponent(code).split('&')[0].trim();
   
   try {
     const { tokens } = await oauth2Client.getToken(cleanCode);
     console.log('\n✅ SUCCESS! Add this line to server/.env:');
     console.log('---------------------------------------------------------');
-    console.log(`RAILS49_EXPORT_REFRESH_TOKEN='${tokens.refresh_token}'`);
+    console.log(`BLOCKS49_EXPORT_REFRESH_TOKEN='${tokens.refresh_token}'`);
     console.log('---------------------------------------------------------');
   } catch (err: any) {
     console.error('❌ Error retrieving access token:', err.response?.data || err.message);

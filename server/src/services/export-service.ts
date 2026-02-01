@@ -15,12 +15,12 @@ export async function exportToDrive(db: BetterSQLite3Database<any> | DrizzleD1Da
         folderName = isProduction ? CONFIG.EXPORT.FOLDER_NAME_PROD : CONFIG.EXPORT.FOLDER_NAME_LOCAL;
     }
     // 1. Auth via DriveClient
-    const clientId = process.env.RAILS49_EXPORT_CLIENT_ID;
-    const clientSecret = process.env.RAILS49_EXPORT_CLIENT_SECRET;
-    const refreshToken = process.env.RAILS49_EXPORT_REFRESH_TOKEN;
+    const clientId = process.env.BLOCKS49_EXPORT_CLIENT_ID;
+    const clientSecret = process.env.BLOCKS49_EXPORT_CLIENT_SECRET;
+    const refreshToken = process.env.BLOCKS49_EXPORT_REFRESH_TOKEN;
 
     if (!clientId || !clientSecret || !refreshToken) {
-        throw new Error('Missing OAuth Credentials (RAILS49_EXPORT_CLIENT_ID, RAILS49_EXPORT_CLIENT_SECRET, RAILS49_EXPORT_REFRESH_TOKEN)');
+        throw new Error('Missing OAuth Credentials (BLOCKS49_EXPORT_CLIENT_ID, BLOCKS49_EXPORT_CLIENT_SECRET, BLOCKS49_EXPORT_REFRESH_TOKEN)');
     }
 
     const drive = new DriveClient(clientId, clientSecret, refreshToken);

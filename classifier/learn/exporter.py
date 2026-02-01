@@ -10,7 +10,7 @@ import torch
 from fastai.vision.all import *  # noqa: F403
 from fastai.vision.all import CrossEntropyLossFlat, error_rate, vision_learner
 
-from .. import R49DataLoaders, R49Dataset
+from .. import B49DataLoaders, B49Dataset
 from ..data.image_transform import apply_scaling_transform
 from .config import LearnerConfig
 
@@ -36,14 +36,14 @@ class Exporter(LearnerConfig):
         super().__init__(model_name)
 
         # Load DataLoaders (needed for validation and sample input)
-        ds = R49Dataset(
+        ds = B49Dataset(
             self.data_dir.rglob("**/*.r49"),
             dpt=self.dpt,
             size=int(1.5 * self.size),
             labels=self.labels,
             image_transform=apply_scaling_transform,
         )
-        self._dls = R49DataLoaders.from_dataset(
+        self._dls = B49DataLoaders.from_dataset(
             ds,
             valid_pct=self.valid_pct,
             crop_size=self.size,
@@ -85,7 +85,7 @@ class Exporter(LearnerConfig):
             export_dir = output_dir
         else:
             export_dir = self.model_dir / "export"
-            
+
         if export_dir.exists():
             shutil.rmtree(export_dir)
         export_dir.mkdir(parents=True, exist_ok=True)

@@ -7,7 +7,7 @@ from classifier import Learner
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train R49 Classifier")
+    parser = argparse.ArgumentParser(description="Train B49 Classifier")
     parser.add_argument(
         "model",
         type=str,

@@ -12,7 +12,7 @@ from PIL import Image
 from .manifest import Manifest
 
 
-class R49File(torch.utils.data.Dataset[tuple[Image.Image, str]]):
+class B49File(torch.utils.data.Dataset[tuple[Image.Image, str]]):
     def __init__(
         self,
         r49file: Path,
@@ -175,4 +175,4 @@ class R49File(torch.utils.data.Dataset[tuple[Image.Image, str]]):
 
     @override
     def __str__(self):
-        return f"R49FileDataset(Path('{self._r49file}'))"
+        return f"B49FileDataset(Path('{self._r49file}'))"

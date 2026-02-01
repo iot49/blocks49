@@ -12,7 +12,7 @@ from fastai.vision.all import (
 )
 
 
-class R49DataLoaders(ImageDataLoaders):
+class B49DataLoaders(ImageDataLoaders):
     @classmethod
     def from_dataset(
         cls,
@@ -24,7 +24,7 @@ class R49DataLoaders(ImageDataLoaders):
         data_augmentation: bool = True,
         **kwargs,
     ) -> ImageDataLoaders:
-        """Create R49DataLoaders from a torch.Dataset."""
+        """Create B49DataLoaders from a torch.Dataset."""
 
         items = list(range(len(dataset)))
 

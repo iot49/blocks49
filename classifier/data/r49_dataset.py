@@ -7,10 +7,10 @@ from cv2.typing import MatLike
 from PIL import Image
 
 from .manifest import Manifest
-from .r49_file import R49File
+from .r49_file import B49File
 
 
-class R49Dataset(torch.utils.data.ConcatDataset[tuple[Image.Image, str]]):
+class B49Dataset(torch.utils.data.ConcatDataset[tuple[Image.Image, str]]):
     def __init__(
         self,
         r49_files: list[Path],
@@ -23,7 +23,7 @@ class R49Dataset(torch.utils.data.ConcatDataset[tuple[Image.Image, str]]):
         labels = labels if labels is not None else ["track", "train", "other"]
         super().__init__(
             [
-                R49File(
+                B49File(
                     r49_file,
                     image_transform=image_transform,
                     dpt=dpt,
@@ -46,4 +46,4 @@ class R49Dataset(torch.utils.data.ConcatDataset[tuple[Image.Image, str]]):
             sample_idx = idx
         else:
             sample_idx = idx - self.cumulative_sizes[dataset_idx - 1]
-        return cast(R49File, self.datasets[dataset_idx]).get_info(sample_idx)
+        return cast(B49File, self.datasets[dataset_idx]).get_info(sample_idx)

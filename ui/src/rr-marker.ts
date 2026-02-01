@@ -111,8 +111,8 @@ export class RrMarker extends LitElement {
       return { width: 1000, height: 1000 };
   }
 
-  // Derived from r49File context
-  // get imageUrl removed, use r49File.getImageUrl(index) directly -> converted to layout.images[index].objectURL
+  // Derived from b49File context
+  // get imageUrl removed, use b49File.getImageUrl(index) directly -> converted to layout.images[index].objectURL
 
   /** The currently selected image index. */
   @property({ type: Number })

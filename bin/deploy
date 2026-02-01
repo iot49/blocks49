@@ -26,20 +26,16 @@ if [ -d "local/server/data/images/models" ]; then
         
         # Check if file already exists on the production site to avoid redundant uploads
         # We use the deployed URL for the check.
-        # Key: models/resnet18/model.config -> URL: https://rails49.org/public/models/resnet18/model.config
+        # Key: models/resnet18/model.config -> URL: https://blocks49.org/public/models/resnet18/model.config
         
         # Note: We rely on the file name being unique. If you change content without changing name, 
         # you must manually delete the object in R2 or disable this check.
-        if curl --output /dev/null --silent --head --fail "https://rails49.org/public/$key"; then
-            echo "Skipping existing $key..."
-        else
-            echo "Uploading $key..."
-            npx wrangler r2 object put rails49-assets/$key --file "$file" > /dev/null
-        fi
+        echo "Uploading $key..."
+        npx wrangler r2 object put blocks49-assets/$key --file "$file" --remote > /dev/null
     done
 else
     echo "No models found in local/server/data/images/models to upload."
 fi
 
 echo "Deploying to Cloudflare..."
-npx wrangler pages deploy ui/dist --project-name rails49
+npx wrangler pages deploy ui/dist --project-name blocks49

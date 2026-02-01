@@ -3,11 +3,11 @@ import os
 from pathlib import Path
 
 # Constants moved from learner.py
-R49DIR = Path(os.getenv("RAILS49DIR", "/Users/boser/Documents/personal/iot/rails49"))
+B49DIR = Path(os.getenv("BLOCKS49DIR", "/Users/boser/Documents/personal/iot/blocks49"))
 
-MODELS_DIR = R49DIR / "models"
+MODELS_DIR = B49DIR / "models"
 DATA_DIR = Path(
-    os.getenv("RAILS49DATA", str(R49DIR / "local/datasets/train-track/r49"))
+    os.getenv("BLOCKS49DATA", str(B49DIR / "local/datasets/train-track/r49"))
 )
 
 VALID_PCT = 0.25

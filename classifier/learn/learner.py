@@ -13,7 +13,7 @@ from fastai.vision.all import (
     vision_learner,
 )
 
-from .. import R49DataLoaders, R49Dataset
+from .. import B49DataLoaders, B49Dataset
 from ..data.image_transform import apply_scaling_transform
 from .config import LearnerConfig
 
@@ -25,7 +25,7 @@ class Learner(LearnerConfig):
         super().__init__(model_name)
 
         # Dataset
-        ds = R49Dataset(
+        ds = B49Dataset(
             self.data_dir.rglob("**/*.r49"),
             dpt=self.dpt,
             size=int(1.5 * self.size),
@@ -33,7 +33,7 @@ class Learner(LearnerConfig):
             image_transform=apply_scaling_transform,
         )
         self._dataset = ds  # Save dataset for lookup in show_results
-        self._dls = R49DataLoaders.from_dataset(
+        self._dls = B49DataLoaders.from_dataset(
             ds,
             valid_pct=VALID_PCT,
             crop_size=self.size,
@@ -122,7 +122,7 @@ class Learner(LearnerConfig):
                 continue
 
             idx = idxs[i]
-            # items[idx] is index in R49Dataset
+            # items[idx] is index in B49Dataset
             original_idx = items[idx]
 
             # Get info from dataset
